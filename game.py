@@ -30,7 +30,16 @@ class Game:
         
         # initialize players, with initial hand of cards
         self.players = [Player([self.get_card_from_deck() for i in xrange(self.k)]) for i in xrange(self.num_players)]
+    
+    
+    def run_turn(self, player):
+        action = player.run_turn()
+        return action
+    
+    
+    def run_game(self):
         
-        
+
+
 
 
