@@ -6,3 +6,5 @@ game.setup()
 
 for player in game.players:
     print player.hand
+
+game.run_game()
