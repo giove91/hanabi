@@ -18,7 +18,7 @@ class Player:
         # choose action for this turn
         # TODO
         card_pos = min(i for (i, card) in enumerate(self.hand) if card is not None)
-        return Action(Action.DISCARD, card_pos=card_pos)
+        return Action(Action.PLAY, card_pos=card_pos)
     
     
     def feed_turn(self):
