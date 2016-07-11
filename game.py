@@ -35,6 +35,7 @@ class Game:
         # initialize players, with initial hand of cards
         self.players = [Player(
                 id = i,
+                game = self,
                 hand = [self.draw_card_from_deck() for i in xrange(self.k)]
             ) for i in xrange(self.num_players)]
         
