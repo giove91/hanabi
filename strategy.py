@@ -1,3 +1,5 @@
+import random
+
 from action import Action
 from card import Card, deck
 
@@ -30,6 +32,9 @@ class Strategy:
         
         # remove cards of other players from possibilities
         self.update_possibilities()
+        
+        # next type of indirect hint to give
+        self.number_hint = True
     
     
     def update(self, hints, lives, my_hand, turn, last_turn):
@@ -82,6 +87,7 @@ class Strategy:
                         self.relevant[i] = True
                     self.log("updated relevant cards: " + self.relevant.__repr__())
                 
+                # process direct hint
                 for (i, p) in enumerate(self.possibilities):
                     for card in self.full_deck:
                         if not card.matches_hint(action, i) and card in p:
@@ -89,7 +95,7 @@ class Strategy:
                             p.remove(card)
             
             if player_id < 4:
-                # indirect hint
+                # process indirect hint
                 n = action.number if action.number_hint else self.COLORS_TO_NUMBERS[action.color]
                 card_pos = player_id
                 modulo = Card.NUM_NUMBERS if action.number_hint else Card.NUM_COLORS
@@ -132,11 +138,58 @@ class Strategy:
         # player i gives information about the cards in position i
         # player 4 gives information about relevant cards (e.g. unique cards, cards to be played)
         
-        if self.hints > 0:
-            return Action(Action.HINT, player_id=self.next_player_id(), number=1)
+        # TODO: check for playable cards
+        
+        if self.hints == 0:
+            # discard card
+            # TODO: choose wisely the card to be discarded
+            return Action(Action.DISCARD, card_pos=random.randint(0, 3))
+        
+        
+        # try to give hint
+        if self.id < 4:
+            # try to give indirect hint
+            
+            # compute sum of visible cards in position card_pos
+            modulo = Card.NUM_NUMBERS if self.number_hint else Card.NUM_COLORS
+            card_pos = self.id
+            involved_cards = [hand[card_pos] for (i, hand) in self.hands.iteritems()]
+            m = sum(card.number if self.number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) % modulo
+            
+            number = m if self.number_hint else None
+            if number == 0:
+                number = 5
+            color  = Card.COLORS[m] if not self.number_hint else None
+            
+            # search for a card matching the hint
+            player_id = None
+            for (i, hand) in self.hands.iteritems():
+                for card in hand:
+                    if card.matches(color=color, number=number):
+                        player_id = i
+            
+            if player_id is None:
+                # failed to find a suitable card
+                # discard card
+                self.log("failed to give an indirect hint about value " + number.__repr__() + " " + color.__repr__())
+                # TODO: choose wisely the card to be discarded
+                return Action(Action.DISCARD, card_pos=random.randint(0, 3))
+            
+            else:
+                # found a suitable card
+                
+                # change type of next indirect hint
+                self.number_hint = False
+                
+                # finally give indirect hint
+                self.log("giving indirect hint")
+                return Action(Action.HINT, player_id=player_id, color=color, number=number)
+        
         else:
-            card_pos = 0
-            return Action(Action.DISCARD, card_pos=card_pos)
+            # try to give hint on some relevant card
+            # TODO
+            return Action(Action.DISCARD, card_pos=random.randint(0, 3))
+
 
     
     def log(self, message):
