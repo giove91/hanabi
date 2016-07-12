@@ -1,5 +1,6 @@
 import random
 from collections import namedtuple
+from termcolor import colored
 
 from card import Card, deck
 from player import Player
@@ -157,7 +158,10 @@ class Game:
         print "Hands:"
         for player in self.players:
             print "    Player %d" % player.id, player.hand
-        print "Board:", self.board
+        print "Board:",
+        for color in Card.COLORS:
+            print colored("%d" % self.board[color], Card.PRINTABLE_COLORS[color]),
+        print
         print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), sum(self.board.itervalues()))
         if self.last_round:
             print "This is the last round (player %d plays last on turn %d)" % (self.last_player.id, self.last_turn)
