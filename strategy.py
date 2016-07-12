@@ -26,6 +26,7 @@ class Strategy:
         
         # for each of my card, I store its possibilities
         self.possibilities = [set(self.full_deck) for i in xrange(self.k)]
+        self.relevant = [False] * self.k
         
         # remove cards of other players from possibilities
         self.update_possibilities()
@@ -52,7 +53,8 @@ class Strategy:
         # update possibilities removing visible cards
         for card in self.visible_cards():
             for p in self.possibilities:
-                p.remove(card)
+                if card in p:
+                    p.remove(card)
     
     
     def next_player_id(self):
@@ -65,15 +67,26 @@ class Strategy:
     def feed_turn(self, player_id, action):
         if player_id == self.id and action.type in [Action.PLAY, Action.DISCARD]:
             # check for my new card
-            self.possibilities[action.card_pos] = set(self.full_deck) if self.my_hand[card_pos] is not None else set()
+            self.possibilities[action.card_pos] = set(self.full_deck) if self.my_hand[action.card_pos] is not None else set()
+            self.relevant[action.card_pos] = False
         
         elif player_id != self.id and action.type == Action.HINT:
             # someone gave a hint!
             
             if action.player_id == self.id:
                 # they gave me a hint!
-                pass
-                # TODO
+                
+                if player_id == 4:
+                    # hint on relevant cards
+                    for i in action.hinted_card_pos:
+                        self.relevant[i] = True
+                    self.log("updated relevant cards: " + self.relevant.__repr__())
+                
+                for (i, p) in enumerate(self.possibilities):
+                    for card in self.full_deck:
+                        if not card.matches_hint(action, i) and card in p:
+                            self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
+                            p.remove(card)
         
         # update possibilities with visible cards
         self.update_possibilities()
@@ -96,6 +109,11 @@ class Strategy:
         else:
             card_pos = 0
             return Action(Action.DISCARD, card_pos=card_pos)
+
+    
+    def log(self, message):
+        print "Player %d: %s" % (self.id, message)
+
 
 
 

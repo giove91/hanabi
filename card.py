@@ -1,5 +1,7 @@
 from termcolor import colored
 
+from action import Action
+
 
 class Card:
     RED = 'Red'
@@ -31,6 +33,7 @@ class Card:
     
     def __repr__(self):
         return colored("%d %s" % (self.number, self.color), self.PRINTABLE_COLORS[self.color])
+        # return colored("%d" % self.number, self.PRINTABLE_COLORS[self.color])
 
     
     def __hash__(self):
@@ -43,6 +46,12 @@ class Card:
 
     def __ne__(self, other):
         return self != other
+    
+    
+    def matches_hint(self, action, card_pos):
+        assert action.type == Action.HINT
+        matches = action.color == self.color or action.number == self.number
+        return card_pos in action.hinted_card_pos and matches or card_pos not in action.hinted_card_pos and not matches
 
 
 
