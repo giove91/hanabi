@@ -1,3 +1,4 @@
+from termcolor import colored
 
 
 class Card:
@@ -10,6 +11,15 @@ class Card:
     
     COLORS = [RED, BLUE, WHITE, YELLOW, GREEN, RAINBOW]
     
+    PRINTABLE_COLORS = {
+            RED: 'red',
+            BLUE: 'blue',
+            WHITE: 'grey',
+            YELLOW: 'yellow',
+            GREEN: 'green',
+            RAINBOW: 'magenta'
+        }
+    
     def __init__(self, color, number):
         assert color in self.COLORS
         assert 1 <= number <= 5
@@ -19,7 +29,7 @@ class Card:
     
     
     def __repr__(self):
-        return "%d %s" % (self.number, self.color)
+        return colored("%d %s" % (self.number, self.color), self.PRINTABLE_COLORS[self.color])
 
 
 def deck():

@@ -158,7 +158,7 @@ class Game:
         for player in self.players:
             print "    Player %d" % player.id, player.hand
         print "Board:", self.board
-        print "Hints: %d    Lives: %d    Deck: %d" % (self.hints, self.lives, len(self.deck))
+        print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), sum(self.board.itervalues()))
         if self.last_round:
             print "This is the last round (player %d plays last on turn %d)" % (self.last_player.id, self.last_turn)
         
@@ -188,6 +188,8 @@ class Game:
             
             # change current player
             current_player_id = (current_player_id + 1) % self.num_players
+        
+        
 
 
 
