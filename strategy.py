@@ -9,7 +9,7 @@ class Strategy:
     """
     
     def __init__(self):
-        pass
+        self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
@@ -71,7 +71,7 @@ class Strategy:
             self.relevant[action.card_pos] = False
         
         elif player_id != self.id and action.type == Action.HINT:
-            # someone gave a hint!
+            # someone else gave a hint!
             
             if action.player_id == self.id:
                 # they gave me a hint!
@@ -85,8 +85,36 @@ class Strategy:
                 for (i, p) in enumerate(self.possibilities):
                     for card in self.full_deck:
                         if not card.matches_hint(action, i) and card in p:
-                            self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
+                            # self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
                             p.remove(card)
+            
+            if player_id < 4:
+                # indirect hint
+                n = action.number if action.number_hint else self.COLORS_TO_NUMBERS[action.color]
+                card_pos = player_id
+                modulo = Card.NUM_NUMBERS if action.number_hint else Card.NUM_COLORS
+                
+                # n should be the sum of the visible cards in position card_pos,
+                # so I can compute something about my card
+                
+                involved_cards = [hand[card_pos] for (i, hand) in self.hands.iteritems() if i != player_id]
+                # self.log("detected indirect hint, cards: " + involved_cards.__repr__())
+                m = sum(card.number if action.number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
+                my_value = (n - m) % modulo
+                
+                number = my_value if action.number_hint else None
+                if number == 0:
+                    number = 5
+                color  = Card.COLORS[my_value] if not action.number_hint else None
+                
+                self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
+                
+                p = self.possibilities[card_pos]
+                for card in self.full_deck:
+                    if not card.matches(color=color, number=number) and card in p:
+                        # print card
+                        p.remove(card)
+        
         
         # update possibilities with visible cards
         self.update_possibilities()

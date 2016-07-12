@@ -37,6 +37,8 @@ class Action:
             player = game.players[self.player_id]
             self.hinted_card_pos = [i for (i, card) in enumerate(player.hand) if card is not None and card.number == self.number or card.color == self.color]
             assert len(self.hinted_card_pos) > 0
+            
+            self.number_hint = self.number is not None  # boolean variable to know if the hint is about numbers or colors
 
 
     def __repr__(self):

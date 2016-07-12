@@ -11,6 +11,9 @@ class Card:
     GREEN = 'Green'
     RAINBOW = 'Rainbow'
     
+    NUM_COLORS = 6
+    NUM_NUMBERS = 5
+    
     COLORS = [RED, BLUE, WHITE, YELLOW, GREEN, RAINBOW]
     
     PRINTABLE_COLORS = {
@@ -21,6 +24,7 @@ class Card:
             GREEN: 'green',
             RAINBOW: 'magenta'
         }
+    
     
     def __init__(self, id, color, number):
         assert color in self.COLORS
@@ -48,9 +52,12 @@ class Card:
         return self != other
     
     
+    def matches(self, color=None, number=None):
+        return color == self.color or number == self.number
+    
     def matches_hint(self, action, card_pos):
         assert action.type == Action.HINT
-        matches = action.color == self.color or action.number == self.number
+        matches = self.matches(action.color, action.number)
         return card_pos in action.hinted_card_pos and matches or card_pos not in action.hinted_card_pos and not matches
 
 
