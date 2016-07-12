@@ -1,20 +1,30 @@
 from action import Action
+from card import Card
 
 
 class Strategy:
-    def __init__(self, id, num_players):
+    """
+    An instance of this class represents a player's strategy.
+    It only has the knowledge of that player, and it must make decisions.
+    """
+    
+    def __init__(self):
+        pass
+    
+    
+    def initialize(self, id, num_players, hands, board, discard_pile):
+        # to be called once before the beginning
         self.id = id
         self.num_players = num_players
-        
-        self.hints = None
-        self.lives = None
-        self.turn = None
+        self.hands = hands  # hands of other players
+        self.board = board
+        self.discard_pile = discard_pile
     
     
-    def update(self, hints, lives, hands, my_hand, turn):
+    def update(self, hints, lives, my_hand, turn):
+        # to be called every turn
         self.hints = hints
         self.lives = lives
-        self.hands = hands
         self.my_hand = my_hand
         self.turn = turn
     
@@ -37,3 +47,6 @@ class Strategy:
         else:
             card_pos = 0
             return Action(Action.DISCARD, card_pos=card_pos)
+
+
+

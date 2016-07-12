@@ -57,6 +57,10 @@ class Game:
         self.last_round = False
         self.last_player = None
         self.last_turn = None
+        
+        # call players' initializations
+        for player in self.players:
+            player.initialize()
     
     
     def get_current_turn(self):

@@ -15,7 +15,7 @@ class Player:
         self.hand = hand
         
         # strategy object
-        self.strategy = Strategy(id, game.num_players)
+        self.strategy = Strategy()
     
     
     def __eq__(self, other):
@@ -29,11 +29,24 @@ class Player:
         return {i: player for (i, player) in enumerate(self.game.players) if player != self}
     
     
+    def initialize(self):
+        # called once after all players are created, before the game starts
+        self.initialize_strategy()
+    
+    
+    def initialize_strategy(self):
+        self.strategy.initialize(
+                id = self.id,
+                num_players = self.game.num_players,
+                hands = {i: player.hand for (i, player) in self.other_players().iteritems()},
+                board = self.game.board,
+                discard_pile = self.game.discard_pile
+            )
+    
     def update_strategy(self):
         self.strategy.update(
                 hints = self.game.hints,
                 lives = self.game.lives,
-                hands = {i: player.hand for (i, player) in self.other_players().iteritems()},
                 my_hand = [0 if card is not None else None for (i, card) in enumerate(self.hand)],
                 turn = self.game.get_current_turn()
             )
