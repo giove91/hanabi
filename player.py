@@ -38,6 +38,7 @@ class Player:
         self.strategy.initialize(
                 id = self.id,
                 num_players = self.game.num_players,
+                k = self.game.k,
                 hands = {i: player.hand for (i, player) in self.other_players().iteritems()},
                 board = self.game.board,
                 discard_pile = self.game.discard_pile
@@ -48,7 +49,8 @@ class Player:
                 hints = self.game.hints,
                 lives = self.game.lives,
                 my_hand = [0 if card is not None else None for (i, card) in enumerate(self.hand)],
-                turn = self.game.get_current_turn()
+                turn = self.game.get_current_turn(),
+                last_turn = self.game.last_turn
             )
     
     
@@ -63,11 +65,10 @@ class Player:
     
     
     def feed_turn(self, turn):
-        # get informed about what happened during a turn
-        self.strategy.feed_turn(turn.player.id, turn.action)
-        
         # update strategy
         self.update_strategy()
-
+        
+        # get informed about what happened during a turn
+        self.strategy.feed_turn(turn.player.id, turn.action)
 
 
