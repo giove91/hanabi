@@ -125,11 +125,12 @@ class Game:
             self.decrement_hints()
             
             # check for correctness
-            assert player != action.player
+            target = self.players[action.player_id]
+            assert player != target
             if action.color is not None:
-                assert any(card.color == action.color for card in action.player.hand)
+                assert any(card.color == action.color for card in target.hand)
             elif action.number is not None:
-                assert any(card.number == action.number for card in action.player.hand)
+                assert any(card.number == action.number for card in target.hand)
                 
         
         else:
@@ -146,7 +147,7 @@ class Game:
         
         elif action.type == Action.HINT:
             print action.type,
-            print "to player %d," % action.player.id,
+            print "to player %d," % action.player_id,
             print "cards", action.hinted_card_pos,
             print "are",
             print action.number if action.number is not None else action.color
@@ -171,16 +172,18 @@ class Game:
     
     def run_game(self):
         end_game = False
-        current_player_id = 0
+        current_player = self.players[0]
+        
+        self.log_status()
         
         while not end_game:
-            player = self.players[current_player_id]
+            raw_input()
             
             # do turn
-            turn, end_game = self.run_turn(player)
+            turn, end_game = self.run_turn(current_player)
             
             # log turn and status
-            self.log_turn(turn, player)
+            self.log_turn(turn, current_player)
             self.log_status()
             
             # inform all players
@@ -191,7 +194,7 @@ class Game:
             self.turns.append(turn)
             
             # change current player
-            current_player_id = (current_player_id + 1) % self.num_players
+            current_player = current_player.next_player()
         
         
 

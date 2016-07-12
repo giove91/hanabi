@@ -1,5 +1,6 @@
 from card import Card
 from action import Action
+from strategy import Strategy
 
 
 class Player:
@@ -12,6 +13,9 @@ class Player:
         
         # initial hand of cards
         self.hand = hand
+        
+        # strategy object
+        self.strategy = Strategy(id, game.num_players)
     
     
     def __eq__(self, other):
@@ -21,23 +25,36 @@ class Player:
     def next_player(self):
         return self.game.players[(self.id + 1) % self.game.num_players]
     
+    def other_players(self):
+        return {i: player for (i, player) in enumerate(self.game.players) if player != self}
+    
+    
+    def update_strategy(self):
+        self.strategy.update(
+                hints = self.game.hints,
+                lives = self.game.lives,
+                hands = {i: player.hand for (i, player) in self.other_players().iteritems()},
+                my_hand = [0 if card is not None else None for (i, card) in enumerate(self.hand)],
+                turn = self.game.get_current_turn()
+            )
+    
     
     def get_turn_action(self):
-        # choose action for this turn
-        # TODO
+        # update strategy (in case this is the first turn)
+        self.update_strategy()
         
-        if self.game.hints > 0:
-            return Action(Action.HINT, player=self.next_player(), number=self.next_player().hand[0].number)
-        else:
-            card_pos = min(i for (i, card) in enumerate(self.hand) if card is not None)
-            return Action(Action.DISCARD, card_pos=card_pos)
+        # choose action for this turn
+        action = self.strategy.get_turn_action()
+        action.apply(self.game)
+        return action
     
     
     def feed_turn(self, turn):
         # get informed about what happened during a turn
-        # TODO
-        pass
-
+        self.strategy.feed_turn(turn.player.id, turn.action)
+        
+        # update strategy
+        self.update_strategy()
 
 
 
