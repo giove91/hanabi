@@ -25,12 +25,15 @@ class Player:
     def get_turn_action(self):
         # choose action for this turn
         # TODO
-        card_pos = min(i for (i, card) in enumerate(self.hand) if card is not None)
-        # return Action(Action.PLAY, card_pos=card_pos)
-        return Action(Action.HINT, player=self.next_player, number=1)
+        
+        if self.game.hints > 0:
+            return Action(Action.HINT, player=self.next_player(), number=self.next_player().hand[0].number)
+        else:
+            card_pos = min(i for (i, card) in enumerate(self.hand) if card is not None)
+            return Action(Action.DISCARD, card_pos=card_pos)
     
     
-    def feed_turn(self):
+    def feed_turn(self, turn):
         # get informed about what happened during a turn
         # TODO
         pass

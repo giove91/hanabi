@@ -55,7 +55,11 @@ class Game:
         # set last round variable
         self.last_round = False
         self.last_player = None
+        self.last_turn = None
     
+    
+    def get_current_turn(self):
+        return len(self.turns)
     
     
     def draw_card_from_deck(self, player=None):
@@ -66,6 +70,7 @@ class Game:
                 # set end game condition
                 self.last_round = True
                 self.last_player = player
+                self.last_turn = self.get_current_turn() + self.num_players
             return None
     
     def increment_hints(self):
@@ -117,6 +122,14 @@ class Game:
         elif action.type == Action.HINT:
             # decrement hints
             self.decrement_hints()
+            
+            # check for correctness
+            assert player != action.player
+            if action.color is not None:
+                assert any(card.color == action.color for card in action.player.hand)
+            elif action.number is not None:
+                assert any(card.number == action.number for card in action.player.hand)
+                
         
         else:
             raise Exception("Unknown action type.")
@@ -124,11 +137,30 @@ class Game:
         return Turn(player, action), end_game
     
     
+    def log_turn(self, turn, player):
+        action = turn.action
+        print "Turn %d (player %d):" % (self.get_current_turn(), player.id),
+        if action.type in [Action.PLAY, Action.DISCARD]:
+            print action.type, self.discard_pile[-1], "(card %d)" % action.card_pos
+        
+        elif action.type == Action.HINT:
+            print action.type,
+            print "to player %d," % action.player.id,
+            print "cards", action.hinted_card_pos,
+            print "are",
+            print action.number if action.number is not None else action.color
+        
+        print
+    
+    
     def log_status(self):
+        print "Hands:"
+        for player in self.players:
+            print "    Player %d" % player.id, player.hand
         print "Board:", self.board
         print "Hints: %d    Lives: %d    Deck: %d" % (self.hints, self.lives, len(self.deck))
         if self.last_round:
-            print "This is the last round (player %d plays last)" % self.last_player.id
+            print "This is the last round (player %d plays last on turn %d)" % (self.last_player.id, self.last_turn)
         
         print
 
@@ -138,14 +170,18 @@ class Game:
         current_player_id = 0
         
         while not end_game:
+            player = self.players[current_player_id]
+            
             # do turn
-            turn, end_game = self.run_turn(self.players[current_player_id])
+            turn, end_game = self.run_turn(player)
             
-            # log turn
-            print "Turn %d (player %d):" % (len(self.turns), current_player_id), turn.action
-            
-            # log status
+            # log turn and status
+            self.log_turn(turn, player)
             self.log_status()
+            
+            # inform all players
+            for player in self.players:
+                player.feed_turn(turn)
             
             # store turn
             self.turns.append(turn)
