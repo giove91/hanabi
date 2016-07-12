@@ -1,7 +1,32 @@
 import random
+from collections import namedtuple
 
 from action import Action
 from card import Card, deck
+
+
+Knowledge = namedtuple("Knowledge", "color number")
+
+
+class IndirectHintsManager:
+    def __init__(self, num_players, k):
+        self.num_players = num_players
+        self.k = k
+        self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
+
+
+    def choose_card(self, player_id, target_id, turn, number_hint):
+        # choose which of the target's cards receive a hint from the current player in the given turn
+        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.number if number_hint else kn.color)]
+        
+        if len(possible_cards) == 0:
+            # do not give hints
+            return None
+        
+        n = turn * 11**3 + (1 if number_hint else 0) * 11**2 + player_id * 11 + target_id
+        
+        return possible_cards[n % len(possible_cards)]
+
 
 
 class Strategy:
@@ -35,6 +60,9 @@ class Strategy:
         
         # next type of indirect hint to give
         self.number_hint = True
+        
+        # indirect hints manager
+        self.indirect_hints_manager = IndirectHintsManager(num_players, k)
     
     
     def update(self, hints, lives, my_hand, turn, last_turn):
@@ -113,7 +141,7 @@ class Strategy:
                     number = 5
                 color  = Card.COLORS[my_value] if not action.number_hint else None
                 
-                self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
+                # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
                 
                 p = self.possibilities[card_pos]
                 for card in self.full_deck:
@@ -138,7 +166,18 @@ class Strategy:
         # player i gives information about the cards in position i
         # player 4 gives information about relevant cards (e.g. unique cards, cards to be played)
         
-        # TODO: check for playable cards
+        
+        for (card_pos, p) in enumerate(self.possibilities):
+            if len(p) < 5:
+                self.log("in position %d the possibilities are" % card_pos + p.__repr__())
+        
+        # check for playable cards in my hand
+        for (card_pos, p) in enumerate(self.possibilities):
+            if all(card.playable(self.board) for card in p) and len(p) > 0:
+                # the card in this position is surely playable!
+                # play the card
+                return Action(Action.PLAY, card_pos=card_pos)
+        
         
         if self.hints == 0:
             # discard card
@@ -165,7 +204,7 @@ class Strategy:
             player_id = None
             for (i, hand) in self.hands.iteritems():
                 for card in hand:
-                    if card.matches(color=color, number=number):
+                    if card is not None and card.matches(color=color, number=number):
                         player_id = i
             
             if player_id is None:
@@ -182,7 +221,7 @@ class Strategy:
                 self.number_hint = False
                 
                 # finally give indirect hint
-                self.log("giving indirect hint")
+                # self.log("giving indirect hint")
                 return Action(Action.HINT, player_id=player_id, color=color, number=number)
         
         else:

@@ -53,13 +53,22 @@ class Card:
     
     
     def matches(self, color=None, number=None):
+        # does this card match the given color/number?
         return color == self.color or number == self.number
     
     def matches_hint(self, action, card_pos):
+        # does this card (in this position) match the given hint?
         assert action.type == Action.HINT
         matches = self.matches(action.color, action.number)
         return card_pos in action.hinted_card_pos and matches or card_pos not in action.hinted_card_pos and not matches
-
+    
+    def playable(self, board):
+        # is this card playable on the board?
+        return self.number == board[self.color] + 1
+    
+    def useful(self, board):
+        # is this card still useful?
+        return self.number > board[self.color]
 
 
 def deck():
