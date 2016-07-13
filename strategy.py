@@ -258,8 +258,14 @@ class Strategy:
                 self.log("discard non-relevant card")
                 return card_pos
         
+        # try to avoid cards that are surely relevant
+        # TODO: do it based on probability of being relevant
+        for (card_pos, p) in enumerate(self.possibilities):
+            if len(p) > 0 and any(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
+                self.log("discard a card that might be non-relevant")
+                return card_pos
+        
         # discard at random
-        # TODO: do it better
         self.log("discard at random")
         return random.choice([card_pos for (card_pos, p) in enumerate(self.possibilities) if len(p) > 0])
     
