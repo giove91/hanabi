@@ -132,9 +132,9 @@ class Game:
             target = self.players[action.player_id]
             assert player != target
             if action.color is not None:
-                assert any(card.color == action.color for card in target.hand)
+                assert any(card is not None and card.color == action.color for card in target.hand)
             elif action.number is not None:
-                assert any(card.number == action.number for card in target.hand)
+                assert any(card is not None and card.number == action.number for card in target.hand)
                 
         
         else:

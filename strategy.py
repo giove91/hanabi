@@ -207,6 +207,22 @@ class Strategy:
                             # self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
                             p.remove(card)
             
+            else:
+                # maybe I wasn't given a hint because I didn't have the right cards
+                # recall: the hint is given to the first suitable person after the one who gives the hint
+                for i in range(player_id + 1, self.num_players) + range(player_id):
+                    if i == action.player_id:
+                        # reached hinted player
+                        break
+                    
+                    elif i == self.id:
+                        # I was reached first!
+                        # I am between the hinter and the hinted player!
+                        for (i, p) in enumerate(self.possibilities):
+                            for card in self.full_deck:
+                                if not card.matches_hint(action, -1) and card in p:
+                                    # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
+                                    p.remove(card)
             
             # process indirect hint
             res = self.indirect_hints_manager.receive_hint(player_id, action)
