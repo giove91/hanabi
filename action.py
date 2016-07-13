@@ -33,6 +33,8 @@ class Action:
     
     def apply(self, game):
         # populate other fields, using information from the game
+        self.turn = game.get_current_turn()
+        
         if self.type == self.HINT:
             player = game.players[self.player_id]
             self.hinted_card_pos = [i for (i, card) in enumerate(player.hand) if card is not None and card.number == self.number or card.color == self.color]

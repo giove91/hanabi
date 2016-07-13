@@ -9,10 +9,14 @@ Knowledge = namedtuple("Knowledge", "color number")
 
 
 class IndirectHintsManager:
-    def __init__(self, num_players, k):
+    def __init__(self, num_players, k, id, strategy):
         self.num_players = num_players
         self.k = k
+        self.id = id    # my player id
+        self.strategy = strategy    # my strategy object
         self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
+        
+        self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
 
 
     def choose_card(self, player_id, target_id, turn, number_hint):
@@ -23,9 +27,51 @@ class IndirectHintsManager:
             # do not give hints
             return None
         
-        n = turn * 11**3 + (1 if number_hint else 0) * 11**2 + player_id * 11 + target_id
+        n = turn * 11**3 + (1 if number_hint else 0) * 119 + player_id * 11 + target_id
         
         return possible_cards[n % len(possible_cards)]
+    
+    
+    def choose_all_cards(self, player_id, turn, number_hint):
+        # choose all cards that receive hints from the given player
+        return {target_id: self.choose_card(player_id, target_id, turn, number_hint) for target_id in xrange(self.num_players) if target_id != player_id and self.choose_card(player_id, target_id, turn, number_hint) is not None}
+    
+    
+    def receive_hint(self, player_id, action):
+        number_hint = action.number_hint
+        cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
+        
+        # update knowledge
+        for (target_id, card_pos) in cards_pos.iteritems():
+            kn = self.knowledge[target_id][card_pos]
+            if number_hint:
+                kn.number = True
+            else:
+                kn.color = True
+        
+        for card_pos in action.hinted_card_pos:
+            kn = self.knowledge[action.player_id][card_pos]
+            if number_hint:
+                kn.number = True
+            else:
+                kn.color = True
+        
+        # decode my hint
+        if self.id in cards_pos:
+            n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
+            my_card_pos = cards_pos[self.id]
+            modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
+            
+            involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id]
+            
+            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
+            my_value = (n - m) % modulo
+            
+            number = my_value if number_hint else None
+            if number == 0:
+                number = 5
+            color = Card.COLORS[my_value] if not number_hint else None
+        
 
 
 
@@ -53,7 +99,6 @@ class Strategy:
         
         # for each of my card, I store its possibilities
         self.possibilities = [set(self.full_deck) for i in xrange(self.k)]
-        self.relevant = [False] * self.k
         
         # remove cards of other players from possibilities
         self.update_possibilities()
@@ -62,7 +107,7 @@ class Strategy:
         self.number_hint = True
         
         # indirect hints manager
-        self.indirect_hints_manager = IndirectHintsManager(num_players, k)
+        self.indirect_hints_manager = IndirectHintsManager(num_players, k, id, self)
     
     
     def update(self, hints, lives, my_hand, turn, last_turn):
