@@ -62,6 +62,7 @@ class Card:
         matches = self.matches(action.color, action.number)
         return card_pos in action.hinted_card_pos and matches or card_pos not in action.hinted_card_pos and not matches
     
+    
     def playable(self, board):
         # is this card playable on the board?
         return self.number == board[self.color] + 1
@@ -69,6 +70,17 @@ class Card:
     def useful(self, board):
         # is this card still useful?
         return self.number > board[self.color]
+    
+    def relevant(self, board, full_deck, discard_pile):
+        # is this card the last copy available?
+        copies_in_deck = len([card for card in full_deck if card.number == self.number and card.color == self.color])
+        copies_in_discard_pile = len([card for card in discard_pile if card.number == self.number and card.color == self.color])
+        
+        # this method should always be called on a card which is not discarded yet
+        assert copies_in_deck > copies_in_discard_pile
+        
+        return self.useful(board) and copies_in_deck == copies_in_discard_pile + 1
+
 
 
 def deck():
