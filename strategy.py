@@ -229,7 +229,7 @@ class Strategy:
             
             if res is not None:
                 card_pos, color, number = res
-                self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
+                # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
             
                 p = self.possibilities[card_pos]
                 for card in self.full_deck:
@@ -240,6 +240,28 @@ class Strategy:
         
         # update possibilities with visible cards
         self.update_possibilities()
+    
+    
+    def get_best_discard(self):
+        """
+        Choose the best card to be discarded.
+        """
+        # first see if I can be sure to discard a useless card
+        for (card_pos, p) in enumerate(self.possibilities):
+            if len(p) > 0 and all(not card.useful(self.board) for card in p):
+                self.log("discard useless card")
+                return card_pos
+        
+        # then see if I can be sure to discard a non-relevant card
+        for (card_pos, p) in enumerate(self.possibilities):
+            if len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
+                self.log("discard non-relevant card")
+                return card_pos
+        
+        # discard at random
+        # TODO: do it better
+        self.log("discard at random")
+        return random.choice([card_pos for (card_pos, p) in enumerate(self.possibilities) if len(p) > 0])
     
     
     def get_turn_action(self):
@@ -260,8 +282,7 @@ class Strategy:
         
         if self.hints == 0:
             # discard card
-            # TODO: choose wisely the card to be discarded
-            return Action(Action.DISCARD, card_pos=random.randint(0, 3))
+            return Action(Action.DISCARD, card_pos=self.get_best_discard())
         
         
         # try to give indirect hint
@@ -301,15 +322,14 @@ class Strategy:
         
         if len(possibilities) > 0:
             num_cards, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
-            self.log("giving indirect hint on %d cards" % num_cards)
+            # self.log("giving indirect hint on %d cards" % num_cards)
             return action
         
         else:
             # failed to give indirect hint
             # discard card
             self.log("failed to give an indirect hint")
-            # TODO: choose wisely the card to be discarded
-            return Action(Action.DISCARD, card_pos=random.randint(0, 3))
+            return Action(Action.DISCARD, card_pos=self.get_best_discard())
 
 
 
