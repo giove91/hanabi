@@ -68,14 +68,16 @@ class Game:
     
     
     def draw_card_from_deck(self, player=None):
+        if len(self.deck) == 1:
+            assert not self.last_round
+            # set end game condition
+            self.last_round = True
+            self.last_player = player
+            self.last_turn = self.get_current_turn() + self.num_players
+        
         if len(self.deck) > 0:
             return self.deck.pop()
         else:
-            if not self.last_round:
-                # set end game condition
-                self.last_round = True
-                self.last_player = player
-                self.last_turn = self.get_current_turn() + self.num_players
             return None
     
     def increment_hints(self):
