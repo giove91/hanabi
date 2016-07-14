@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
+import sys
 from termcolor import colored
 
 from action import Action
@@ -55,6 +55,10 @@ class Card:
     def __ne__(self, other):
         return self != other
     
+    def equals(self, other):
+        # same color and number (but possibly different id)
+        return self.color == other.color and self.number == other.number
+    
     
     def matches(self, color=None, number=None):
         # does this card match the given color/number?
@@ -71,19 +75,29 @@ class Card:
         # is this card playable on the board?
         return self.number == board[self.color] + 1
     
-    def useful(self, board):
+    def useful(self, board, full_deck, discard_pile):
         # is this card still useful?
+        
+        # check that lower cards still exist
+        for number in xrange(board[self.color] + 1, self.number):
+            copies_in_deck = sum(1 for card in full_deck if card.equals(Card(id=-1, color=self.color, number=number)))
+            copies_in_discard_pile = sum(1 for card in discard_pile if card.equals(Card(id=-1, color=self.color, number=number)))
+            
+            if copies_in_deck == copies_in_discard_pile:
+                # some lower card was discarded!
+                return False
+        
         return self.number > board[self.color]
     
     def relevant(self, board, full_deck, discard_pile):
         # is this card the last copy available?
-        copies_in_deck = len([card for card in full_deck if card.number == self.number and card.color == self.color])
-        copies_in_discard_pile = len([card for card in discard_pile if card.number == self.number and card.color == self.color])
+        copies_in_deck = sum(1 for card in full_deck if self.equals(card))
+        copies_in_discard_pile = sum(1 for card in discard_pile if self.equals(card))
         
         # this method should always be called on a card which is not discarded yet
         assert copies_in_deck > copies_in_discard_pile
         
-        return self.useful(board) and copies_in_deck == copies_in_discard_pile + 1
+        return self.useful(board, full_deck, discard_pile) and copies_in_deck == copies_in_discard_pile + 1
 
 
 

@@ -297,7 +297,7 @@ class Strategy:
         
         # first see if I can be sure to discard a useless card
         for (card_pos, p) in enumerate(self.possibilities):
-            if len(p) > 0 and all(not card.useful(self.board) for card in p):
+            if len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p):
                 self.log("discard useless card")
                 return card_pos
         
@@ -310,10 +310,18 @@ class Strategy:
         
         # try to avoid cards that are surely relevant
         # TODO: do it based on probability of being relevant
+        best_card_pos = None
+        best_relevant_ratio = 1.0
         for (card_pos, p) in enumerate(self.possibilities):
-            if len(p) > 0 and any(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
-                self.log("discard a card that might be non-relevant")
-                return card_pos
+            if len(p) > 0:
+                num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                relevant_ratio = float(num_relevant) / len(p)
+                if relevant_ratio < best_relevant_ratio:
+                    best_card_pos, best_relevant_ratio = card_pos, relevant_ratio
+        
+        if best_card_pos is not None:
+            self.log("discard a card that might be non-relevant (relevant ratio %f)" % best_relevant_ratio)
+            return best_card_pos
         
         # discard at random
         self.log("discard at random")
