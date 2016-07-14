@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
 from card import Card
 from action import Action
 from strategy import Strategy

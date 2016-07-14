@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import random
 import itertools
 import copy
@@ -205,7 +208,7 @@ class Strategy:
             # check if this hand is possible
             if all(card is None or card in self.possibilities[card_pos] for (card_pos, card) in enumerate(hand)):
                 # this hand is possible
-                self.log("possible hand " + hand.__repr__())
+                # self.log("possible hand " + hand.__repr__())
                 
                 for (card_pos, card) in enumerate(hand):
                     if card is not None:
@@ -264,7 +267,7 @@ class Strategy:
                                 if not card.matches_hint(action, -1) and card in p:
                                     # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
                                     p.remove(card)
-            
+                
             # process indirect hint
             res = self.indirect_hints_manager.receive_hint(player_id, action)
             
@@ -282,7 +285,7 @@ class Strategy:
         self.update_possibilities()
         
         # print knowledge
-        if self.debug and self.id == 0:
+        if self.debug and self.id == self.num_players-1:
             self.indirect_hints_manager.print_knowledge()
     
     
@@ -290,12 +293,15 @@ class Strategy:
         """
         Choose the best card to be discarded.
         """
+        # TODO: ora che si danno indizi preferibilmente alle carte importanti, bisognerebbe tenerne conto negli scarti
+        
         # first see if I can be sure to discard a useless card
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.useful(self.board) for card in p):
                 self.log("discard useless card")
                 return card_pos
         
+        # TODO: se ci sono più possibilità, scegliere carte più alte / più probabilmente non giocabili
         # then see if I can be sure to discard a non-relevant card
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
@@ -340,7 +346,9 @@ class Strategy:
             # compute which cards would be involved in this indirect hint
             cards_pos = self.indirect_hints_manager.choose_all_cards(self.id, self.turn, number_hint)
             
-            # TODO: forse giudicare in base a *quali* carte sono, e non solo a quante
+            involved_cards = [self.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
+            
+            # TODO: giudicare in base a *quali* carte sono, e non solo a quante
             
             res = self.indirect_hints_manager.compute_hint(self.turn, number_hint)
             if res is not None:
@@ -362,14 +370,26 @@ class Strategy:
                 
                 
                 if player_id is not None:
-                    possibilities[number_hint] = len(cards_pos) + num_matches, Action(Action.HINT, player_id=player_id, color=color, number=number)
+                    # found player to give the hint to
+                    involved_cards += [card for card in self.hands[player_id] if card is not None and card.matches(color=color, number=number)]
+                    involved_cards = list(set(involved_cards))
+                    num_relevant = sum(1 for card in involved_cards if card.relevant(self.board, self.full_deck, self.discard_pile))
+                    num_playable = sum(1 for card in involved_cards if card.playable(self.board))
+                    
+                    # self.log("involved cards: " + involved_cards.__repr__())
+                    # self.log("there are %d relevant cards and %d playable cards" % (num_relevant, num_playable))
+                    
+                    # TODO: tener conto dei giocatori che eventualmente non giocheranno più
+                    # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
+                    
+                    possibilities[number_hint] = (num_relevant + num_playable, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
         
         if len(possibilities) > 0:
-            num_cards, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
-            # self.log("giving indirect hint on %d cards" % num_cards)
+            score, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
+            self.log("giving indirect hint on %d cards with score %d" % (score[1], score[0]))
             return action
         
         else:
