@@ -293,8 +293,6 @@ class Strategy:
         """
         Choose the best card to be discarded.
         """
-        # TODO: ora che si danno indizi preferibilmente alle carte importanti, bisognerebbe tenerne conto negli scarti
-        
         # first see if I can be sure to discard a useless card
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p):
@@ -302,15 +300,16 @@ class Strategy:
                 return card_pos
         
         # TODO: se ci sono più possibilità, scegliere carte più alte / più probabilmente non giocabili
+        """
         # then see if I can be sure to discard a non-relevant card
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
                 self.log("discard non-relevant card")
                 return card_pos
-        
+        """
         # try to avoid cards that are surely relevant
         best_card_pos = None
-        best_relevant_ratio = 1.0
+        best_relevant_ratio = 2.0
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0:
                 num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
@@ -318,19 +317,15 @@ class Strategy:
                 if relevant_ratio < best_relevant_ratio:
                     best_card_pos, best_relevant_ratio = card_pos, relevant_ratio
         
-        if best_card_pos is not None:
-            self.log("discard a card that might be non-relevant (relevant ratio %f)" % best_relevant_ratio)
-            return best_card_pos
-        
-        # discard at random
-        self.log("discard at random")
-        return random.choice([card_pos for (card_pos, p) in enumerate(self.possibilities) if len(p) > 0])
+        self.log("discard a card that might be non-relevant (relevant ratio %f)" % best_relevant_ratio)
+        return best_card_pos
     
     
     def get_best_play(self):
         """
         Choose the best card to play.
         """
+        # TODO: preferire carte basse e i 5 (perché danno indizi)
         best_card_pos = None
         best_avg_num_playable = -1.0
         for (card_pos, p) in enumerate(self.possibilities):
