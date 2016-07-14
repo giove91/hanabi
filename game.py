@@ -117,6 +117,10 @@ class Game:
             if card.number == self.board[card.color] + 1:
                 # play is successful
                 self.board[card.color] += 1
+                
+                if card.number == 5:
+                    # increment hints!
+                    self.increment_hints()
             else:
                 # play is not successful
                 end_game = end_game or self.decrement_lives()
