@@ -50,7 +50,8 @@ class Player:
                 lives = self.game.lives,
                 my_hand = [0 if card is not None else None for (i, card) in enumerate(self.hand)],
                 turn = self.game.get_current_turn(),
-                last_turn = self.game.last_turn
+                last_turn = self.game.last_turn,
+                deck_size = len(self.game.deck)
             )
     
     

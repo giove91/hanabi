@@ -1,5 +1,6 @@
 import random
 import itertools
+import copy
 
 from action import Action
 from card import Card, deck
@@ -154,13 +155,14 @@ class Strategy:
         self.indirect_hints_manager = IndirectHintsManager(num_players, k, id, self)
     
     
-    def update(self, hints, lives, my_hand, turn, last_turn):
+    def update(self, hints, lives, my_hand, turn, last_turn, deck_size):
         # to be called every turn
         self.hints = hints
         self.lives = lives
         self.my_hand = my_hand
         self.turn = turn
         self.last_turn = last_turn
+        self.deck_size = deck_size
     
     
     def visible_cards(self):
@@ -200,14 +202,17 @@ class Strategy:
                     hand[card_pos] = comb[i]
                     i += 1
             
-            print hand
-            
             # check if this hand is possible
             if all(card is None or card in self.possibilities[card_pos] for (card_pos, card) in enumerate(hand)):
                 # this hand is possible
+                self.log("possible hand " + hand.__repr__())
+                
                 for (card_pos, card) in enumerate(hand):
                     if card is not None:
                         new_possibilities[card_pos].add(card)
+        
+        self.log("old possibilities " + [len(p) for p in self.possibilities].__repr__())
+        self.log("new possibilities " + [len(p) for p in new_possibilities].__repr__())
         
         # update possibilities
         self.possibilities = new_possibilities
@@ -275,6 +280,10 @@ class Strategy:
         
         # update possibilities with visible cards
         self.update_possibilities()
+        
+        # print knowledge
+        if self.debug and self.id == 0:
+            self.indirect_hints_manager.print_knowledge()
     
     
     def get_best_discard(self):
@@ -306,13 +315,9 @@ class Strategy:
     
     
     def get_turn_action(self):
-        # strategy for a 5-player game
-        assert self.num_players == 5
-        assert self.k == 4
-        
-        if self.debug:
-            self.indirect_hints_manager.print_knowledge()
-        
+        # update possibilities checking all combinations
+        if self.deck_size < 10:
+            self.update_possibilities_with_combinations()
         
         # check for playable cards in my hand
         for (card_pos, p) in enumerate(self.possibilities):
