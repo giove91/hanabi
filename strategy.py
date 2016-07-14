@@ -345,10 +345,7 @@ class Strategy:
         for number_hint in [False, True]:
             # compute which cards would be involved in this indirect hint
             cards_pos = self.indirect_hints_manager.choose_all_cards(self.id, self.turn, number_hint)
-            
             involved_cards = [self.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
-            
-            # TODO: giudicare in base a *quali* carte sono, e non solo a quante
             
             res = self.indirect_hints_manager.compute_hint(self.turn, number_hint)
             if res is not None:
@@ -381,15 +378,15 @@ class Strategy:
                     
                     # TODO: tener conto dei giocatori che eventualmente non giocheranno più
                     # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
-                    
-                    possibilities[number_hint] = (num_relevant + num_playable, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
+                    # give priority to playable cards, then to relevant cards, then to the number of cards
+                    possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
         
         if len(possibilities) > 0:
             score, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
-            self.log("giving indirect hint on %d cards with score %d" % (score[1], score[0]))
+            self.log("giving indirect hint on %d cards with score %d, %d" % (score[2], score[0], score[1]))
             return action
         
         else:
