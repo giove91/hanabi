@@ -317,7 +317,7 @@ class Strategy:
                 if relevant_ratio < best_relevant_ratio:
                     best_card_pos, best_relevant_ratio = card_pos, relevant_ratio
         
-        self.log("discard a card that might be non-relevant (relevant ratio %f)" % best_relevant_ratio)
+        self.log("discard a card (relevant ratio %f)" % best_relevant_ratio)
         return best_card_pos
     
     
@@ -365,6 +365,8 @@ class Strategy:
             # discard card
             return Action(Action.DISCARD, card_pos=self.get_best_discard())
         
+        # TODO: forse non dare un suggerimento se non si riesce a suggerire nessuna carta giocabile
+        # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza
         
         # try to give indirect hint
         # try the two possible number_hint values
