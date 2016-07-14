@@ -127,8 +127,9 @@ class Strategy:
     It only has the knowledge of that player, and it must make decisions.
     """
     
-    def __init__(self):
+    def __init__(self, debug=False):
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
+        self.debug = debug
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
@@ -269,7 +270,6 @@ class Strategy:
                 p = self.possibilities[card_pos]
                 for card in self.full_deck:
                     if not card.matches(color=color, number=number) and card in p:
-                        # print card
                         p.remove(card)
         
         
@@ -310,7 +310,8 @@ class Strategy:
         assert self.num_players == 5
         assert self.k == 4
         
-        self.indirect_hints_manager.print_knowledge()
+        if self.debug:
+            self.indirect_hints_manager.print_knowledge()
         
         
         # check for playable cards in my hand
@@ -376,7 +377,8 @@ class Strategy:
 
     
     def log(self, message):
-        print "Player %d: %s" % (self.id, message)
+        if self.debug:
+            print "Player %d: %s" % (self.id, message)
 
 
 

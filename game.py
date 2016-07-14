@@ -18,8 +18,11 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players):
+    def __init__(self, num_players, wait_key=True, log=True, strategy_debug=False):
         self.num_players = num_players
+        self.wait_key = wait_key
+        self.log = log
+        self.strategy_debug = strategy_debug
         
         # compute number of cards per player
         self.k = self.CARDS_PER_PLAYER[num_players]
@@ -37,7 +40,8 @@ class Game:
         self.players = [Player(
                 id = i,
                 game = self,
-                hand = [self.draw_card_from_deck() for i in xrange(self.k)]
+                hand = [self.draw_card_from_deck() for i in xrange(self.k)],
+                strategy_debug = self.strategy_debug
             ) for i in xrange(self.num_players)]
         
         # set number of hints and lives
@@ -66,6 +70,8 @@ class Game:
     def get_current_turn(self):
         return len(self.turns)
     
+    def get_current_score(self):
+        return sum(self.board.itervalues())
     
     def draw_card_from_deck(self, player=None):
         if len(self.deck) == 1:
@@ -169,7 +175,7 @@ class Game:
         for color in Card.COLORS:
             print colored("%d" % self.board[color], Card.PRINTABLE_COLORS[color]),
         print
-        print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), sum(self.board.itervalues()))
+        print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), self.get_current_score())
         if self.last_round:
             print "This is the last round (player %d plays last on turn %d)" % (self.last_player.id, self.last_turn)
         
@@ -180,17 +186,20 @@ class Game:
         end_game = False
         current_player = self.players[0]
         
-        self.log_status()
+        if self.log:
+            self.log_status()
         
         while not end_game:
-            raw_input()
+            if self.wait_key:
+                raw_input()
             
             # do turn
             turn, end_game = self.run_turn(current_player)
             
             # log turn and status
-            self.log_turn(turn, current_player)
-            self.log_status()
+            if self.log:
+                self.log_turn(turn, current_player)
+                self.log_status()
             
             # inform all players
             for player in self.players:
@@ -201,6 +210,8 @@ class Game:
             
             # change current player
             current_player = current_player.next_player()
+        
+        return self.get_current_score()
         
         
 
