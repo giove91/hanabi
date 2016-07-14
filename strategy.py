@@ -309,7 +309,6 @@ class Strategy:
                 return card_pos
         
         # try to avoid cards that are surely relevant
-        # TODO: do it based on probability of being relevant
         best_card_pos = None
         best_relevant_ratio = 1.0
         for (card_pos, p) in enumerate(self.possibilities):
@@ -328,17 +327,43 @@ class Strategy:
         return random.choice([card_pos for (card_pos, p) in enumerate(self.possibilities) if len(p) > 0])
     
     
+    def get_best_play(self):
+        """
+        Choose the best card to play.
+        """
+        best_card_pos = None
+        best_avg_num_playable = -1.0
+        for (card_pos, p) in enumerate(self.possibilities):
+            if all(card.playable(self.board) for card in p) and len(p) > 0:
+                # the card in this position is surely playable!
+                
+                # how many cards of the other players become playable, on average?
+                num_playable = []
+                for card in p:
+                    fake_board = copy.copy(self.board)
+                    fake_board[card.color] += 1
+                    num_playable.append(sum(1 for (player_id, hand) in self.hands.iteritems() for c in hand if c is not None and c.playable(fake_board)))
+                
+                avg_num_playable = float(sum(num_playable)) / len(num_playable)
+                
+                if avg_num_playable > best_avg_num_playable:
+                    best_card_pos, best_avg_num_playable = card_pos, avg_num_playable
+        
+        if best_card_pos is not None:
+            self.log("playing card in position %d gives %f playable cards on average" % (best_card_pos, best_avg_num_playable))
+        return best_card_pos
+    
+    
     def get_turn_action(self):
         # update possibilities checking all combinations
         if self.deck_size < 10:
             self.update_possibilities_with_combinations()
         
         # check for playable cards in my hand
-        for (card_pos, p) in enumerate(self.possibilities):
-            if all(card.playable(self.board) for card in p) and len(p) > 0:
-                # the card in this position is surely playable!
-                # play the card
-                return Action(Action.PLAY, card_pos=card_pos)
+        card_pos = self.get_best_play()
+        if card_pos is not None:
+            # play the card
+            return Action(Action.PLAY, card_pos=card_pos)
         
         
         if self.hints == 0:
