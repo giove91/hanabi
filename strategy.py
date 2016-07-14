@@ -1,4 +1,5 @@
 import random
+import itertools
 
 from action import Action
 from card import Card, deck
@@ -175,6 +176,40 @@ class Strategy:
             for p in self.possibilities:
                 if card in p:
                     p.remove(card)
+    
+    def update_possibilities_with_combinations(self):
+        # update possibilities examining all combinations of my hand
+        # better to do it with only few cards remaining!
+        possible_cards = set()
+        for p in self.possibilities:
+            possible_cards |= p
+        
+        new_possibilities = [set() for card_pos in xrange(self.k)]
+        
+        num_cards = len([x for x in self.my_hand if x is not None])
+        assert num_cards <= self.k
+        
+        # cycle over all combinations
+        for comb in itertools.permutations(possible_cards, num_cards):
+            # construct hand
+            hand = copy.copy(self.my_hand)
+            i = 0
+            for card_pos in xrange(self.k):
+                if hand[card_pos] is not None:
+                    hand[card_pos] = comb[i]
+                    i += 1
+            
+            print hand
+            
+            # check if this hand is possible
+            if all(card is None or card in self.possibilities[card_pos] for (card_pos, card) in enumerate(hand)):
+                # this hand is possible
+                for (card_pos, card) in enumerate(hand):
+                    if card is not None:
+                        new_possibilities[card_pos].add(card)
+        
+        # update possibilities
+        self.possibilities = new_possibilities
     
     
     def next_player_id(self):
