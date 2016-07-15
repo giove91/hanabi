@@ -402,6 +402,7 @@ class Strategy:
                     involved_cards = list(set(involved_cards))
                     num_relevant = sum(1 for card in involved_cards if card.relevant(self.board, self.full_deck, self.discard_pile))
                     num_playable = sum(1 for card in involved_cards if card.playable(self.board))
+                    num_useful = sum(1 for card in involved_cards if card.useful(self.board, self.full_deck, self.discard_pile))
                     
                     # self.log("involved cards: " + involved_cards.__repr__())
                     # self.log("there are %d relevant cards and %d playable cards" % (num_relevant, num_playable))
