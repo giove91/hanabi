@@ -96,14 +96,17 @@ class IndirectHintsManager:
         
         
         if number_hint:
-            visible_numbers = set(card.number for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
-            if len(visible_numbers) < Card.NUM_NUMBERS:
-                # maybe the hinter was forced to make his choice because the number he wanted was not available
-                return None
-        else:
+            # the alternative hint would have been on colors
             visible_colors = set(card.color for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
             if len(visible_colors) < Card.NUM_COLORS:
                 # maybe the hinter was forced to make his choice because the color he wanted was not available
+                return None
+            
+        else:
+        # the alternative hint would have been on numbers
+            visible_numbers = set(card.number for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
+            if len(visible_numbers) < Card.NUM_NUMBERS:
+                # maybe the hinter was forced to make his choice because the number he wanted was not available
                 return None
         
         
@@ -490,7 +493,7 @@ class Strategy:
                     # WARNING: it is important that the first parameter is the number of playable cards,
                     # because other players obtain information from this
                     possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
-                    print number_hint, possibilities[number_hint], "involved cards:", involved_cards
+                    # print number_hint, possibilities[number_hint], "involved cards:", involved_cards
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
