@@ -16,6 +16,14 @@ class Knowledge:
     
     def __repr__(self):
         return ("C" if self.color else "-") + ("N" if self.number else "-")
+    
+    
+    def knows(self, number_hint=False):
+        if number_hint:
+            return self.number
+        else:
+            return self.color
+
 
 
 class IndirectHintsManager:
@@ -27,7 +35,11 @@ class IndirectHintsManager:
         self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
         
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
-
+    
+    
+    def log(self, message):
+        self.strategy.log(message)
+    
 
     def reset_knowledge(self, player_id, card_pos, new_card_exists):
         self.knowledge[player_id][card_pos] = Knowledge(False, False) if new_card_exists else Knowledge(True, True)
@@ -41,6 +53,7 @@ class IndirectHintsManager:
             print
         print
 
+
     def choose_card(self, player_id, target_id, turn, number_hint):
         # choose which of the target's cards receive a hint from the current player in the given turn
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.number if number_hint else kn.color)]
@@ -49,6 +62,7 @@ class IndirectHintsManager:
             # do not give hints
             return None
         
+        # TODO: forse usare un vero hash
         n = turn * 11**3 + (1 if number_hint else 0) * 119 + player_id * 11 + target_id
         
         return possible_cards[n % len(possible_cards)]
@@ -59,7 +73,66 @@ class IndirectHintsManager:
         return {target_id: self.choose_card(player_id, target_id, turn, number_hint) for target_id in xrange(self.num_players) if target_id != player_id and self.choose_card(player_id, target_id, turn, number_hint) is not None}
     
     
+    def infer_playable_cards(self, player_id, action):
+        """
+        From the choice made by the hinter (give hint on color or number), infer something
+        about the playability of my cards.
+        Here it is important that:
+        - playability of a card depends only on things that everyone sees;
+        - the choice of the type of hint (color/number) is primarily based on the number of playable cards.
+        Call this function before receive_hint(), i.e. before knowledge is updated.
+        """
+        number_hint = action.number_hint
+        cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
+        alternative_cards_pos = self.choose_all_cards(player_id, action.turn, not number_hint)
+        
+        if self.id not in cards_pos or self.id not in alternative_cards_pos:
+            # I already knew about one of the two cards
+            return None
+
+        if action.player_id == self.id:
+            # the hint was given to me, so I haven't enough information to infer something
+            return None
+        
+        
+        if number_hint:
+            visible_numbers = set(card.number for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
+            if len(visible_numbers) < Card.NUM_NUMBERS:
+                # maybe the hinter was forced to make his choice because the number he wanted was not available
+                return None
+        else:
+            visible_colors = set(card.color for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
+            if len(visible_colors) < Card.NUM_COLORS:
+                # maybe the hinter was forced to make his choice because the color he wanted was not available
+                return None
+        
+        
+        involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos] + [self.strategy.hands[action.player_id][card_pos] for card_pos in action.hinted_card_pos]
+        
+        involved_cards = list(set(involved_cards))
+        my_card_pos = cards_pos[self.id]
+        num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board))
+        
+        alternative_involved_cards = [hand[alternative_cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in alternative_cards_pos]
+        alternative_my_card_pos = alternative_cards_pos[self.id]
+        alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board))
+        
+        self.strategy.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        self.strategy.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        self.strategy.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        
+        if alternative_num_playable > num_playable:
+            assert alternative_num_playable == num_playable + 1
+            
+            self.strategy.log("EEEEEEEEEEEEEEEEE")
+            # TODO
+        
+        
+
     def receive_hint(self, player_id, action):
+        """
+        Decode hint given by someone else (not necessarily directly to me).
+        """
         number_hint = action.number_hint
         cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
         
@@ -101,8 +174,11 @@ class IndirectHintsManager:
             return None
     
     
+    
     def compute_hint(self, turn, number_hint):
-        # returns the color or the number we need to give a hint about
+        """
+        Returns the color or the number we need to give a hint about.
+        """
         cards_pos = self.choose_all_cards(self.id, turn, number_hint)
         
         if len(cards_pos) == 0:
@@ -269,6 +345,7 @@ class Strategy:
                                     p.remove(card)
                 
             # process indirect hint
+            self.indirect_hints_manager.infer_playable_cards(player_id, action)
             res = self.indirect_hints_manager.receive_hint(player_id, action)
             
             if res is not None:
@@ -398,7 +475,7 @@ class Strategy:
                 
                 if player_id is not None:
                     # found player to give the hint to
-                    involved_cards += [card for card in self.hands[player_id] if card is not None and card.matches(color=color, number=number)]
+                    involved_cards += [card for (card_pos, card) in enumerate(self.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.indirect_hints_manager.knowledge[player_id][card_pos].knows(number_hint)]
                     involved_cards = list(set(involved_cards))
                     num_relevant = sum(1 for card in involved_cards if card.relevant(self.board, self.full_deck, self.discard_pile))
                     num_playable = sum(1 for card in involved_cards if card.playable(self.board))
@@ -410,7 +487,10 @@ class Strategy:
                     # TODO: tener conto dei giocatori che eventualmente non giocheranno più
                     # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
                     # give priority to playable cards, then to relevant cards, then to the number of cards
+                    # WARNING: it is important that the first parameter is the number of playable cards,
+                    # because other players obtain information from this
                     possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
+                    print number_hint, possibilities[number_hint], "involved cards:", involved_cards
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
