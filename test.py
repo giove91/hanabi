@@ -21,7 +21,7 @@ if __name__ == "__main__":
     print "Starting %d simulations with %d players..." % (num_simulations, num_players)
     for i in xrange(num_simulations):
         print >> sys.stderr, i,
-        game = Game(num_players=5, wait_key=False, log=False, strategy_debug=False)
+        game = Game(num_players=num_players, wait_key=False, log=False, strategy_debug=False)
         
         game.setup()
         statistics = game.run_game()

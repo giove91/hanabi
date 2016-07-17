@@ -180,7 +180,7 @@ class HintsManager:
     
     def compute_hint(self, turn, number_hint):
         """
-        Returns the color or the number we need to give a hint about.
+        Returns the color/number we need to give a hint about.
         """
         cards_pos = self.choose_all_cards(self.id, turn, number_hint)
         
@@ -200,7 +200,69 @@ class HintsManager:
         
         return color, number
         
+    
+    def get_best_hint(self, turn):
+        """
+        Choose the best hint to give, if any.
+        """
+        # try the two possible number_hint values
+        possibilities = {False: None, True: None}   # possibilities for number_hint, with results
         
+        for number_hint in [False, True]:
+            # compute which cards would be involved in this indirect hint
+            cards_pos = self.choose_all_cards(self.id, turn, number_hint)
+            involved_cards = [self.strategy.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
+            
+            res = self.compute_hint(turn, number_hint)
+            if res is not None:
+                color, number = res
+            
+                # search for the first player with cards matching the hint
+                player_id = None
+                num_matches = None
+                for i in range(self.id + 1, self.num_players) + range(self.id):
+                    hand = self.strategy.hands[i]
+                    num_matches = 0
+                    for card in hand:
+                        if card is not None and card.matches(color=color, number=number):
+                            # found!
+                            num_matches += 1
+                    if num_matches > 0:
+                        player_id = i
+                        break
+                
+                
+                if player_id is not None:
+                    # found player to give the hint to
+                    involved_cards += [card for (card_pos, card) in enumerate(self.strategy.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.knowledge[player_id][card_pos].knows(number_hint)]
+                    involved_cards = list(set(involved_cards))
+                    num_relevant = sum(1 for card in involved_cards if card.relevant(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile))
+                    num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board))
+                    num_useful = sum(1 for card in involved_cards if card.useful(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile))
+                    
+                    # self.log("involved cards: " + involved_cards.__repr__())
+                    # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
+                    
+                    # TODO: tener conto dei giocatori che eventualmente non giocheranno più
+                    # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
+                    # Give priority to playable cards, then to relevant cards, then to the number of cards.
+                    # WARNING: it is important that the first parameter is the number of playable cards,
+                    # because other players obtain information from this.
+                    # If the hint doesn't involve any useful card, avoid giving the hint.
+                    if num_useful > 0:
+                        possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
+        
+        
+        # choose between color and number
+        possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
+        
+        if len(possibilities) > 0:
+            score, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
+            self.log("giving indirect hint on %d cards with score %d, %d" % (score[2], score[0], score[1]))
+            return action
+        
+        else:
+            return None
 
 
 
@@ -447,6 +509,7 @@ class Strategy:
         return best_card_pos
     
     
+    
     def get_turn_action(self):
         # update possibilities checking all combinations
         if self.deck_size < 10:
@@ -466,61 +529,9 @@ class Strategy:
         # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza, o se ha solo carte rilevanti
         
         # try to give indirect hint
-        # try the two possible number_hint values
-        possibilities = {False: None, True: None}   # possibilities for number_hint, with results
-        
-        for number_hint in [False, True]:
-            # compute which cards would be involved in this indirect hint
-            cards_pos = self.hints_manager.choose_all_cards(self.id, self.turn, number_hint)
-            involved_cards = [self.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
-            
-            res = self.hints_manager.compute_hint(self.turn, number_hint)
-            if res is not None:
-                color, number = res
-            
-                # search for the first player with cards matching the hint
-                player_id = None
-                num_matches = None
-                for i in range(self.id + 1, self.num_players) + range(self.id):
-                    hand = self.hands[i]
-                    num_matches = 0
-                    for card in hand:
-                        if card is not None and card.matches(color=color, number=number):
-                            # found!
-                            num_matches += 1
-                    if num_matches > 0:
-                        player_id = i
-                        break
-                
-                
-                if player_id is not None:
-                    # found player to give the hint to
-                    involved_cards += [card for (card_pos, card) in enumerate(self.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.hints_manager.knowledge[player_id][card_pos].knows(number_hint)]
-                    involved_cards = list(set(involved_cards))
-                    num_relevant = sum(1 for card in involved_cards if card.relevant(self.board, self.full_deck, self.discard_pile))
-                    num_playable = sum(1 for card in involved_cards if card.playable(self.board))
-                    num_useful = sum(1 for card in involved_cards if card.useful(self.board, self.full_deck, self.discard_pile))
-                    
-                    # self.log("involved cards: " + involved_cards.__repr__())
-                    # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
-                    
-                    # TODO: tener conto dei giocatori che eventualmente non giocheranno più
-                    # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
-                    # Give priority to playable cards, then to relevant cards, then to the number of cards.
-                    # WARNING: it is important that the first parameter is the number of playable cards,
-                    # because other players obtain information from this.
-                    # If the hint doesn't involve any useful card, avoid giving the hint.
-                    if num_useful > 0:
-                        possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
-        
-        
-        # choose between color and number
-        possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
-        
-        if len(possibilities) > 0:
-            score, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
-            self.log("giving indirect hint on %d cards with score %d, %d" % (score[2], score[0], score[1]))
-            return action
+        best_hint = self.hints_manager.get_best_hint(self.turn)
+        if best_hint is not None:
+            return best_hint
         
         else:
             # failed to give indirect hint
