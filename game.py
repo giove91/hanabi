@@ -12,7 +12,7 @@ from action import Action
 
 
 Turn = namedtuple("Turn", "player action")
-
+Statistics = namedtuple("Statistics", "score lives hints num_turns")
 
 
 class Game:
@@ -219,7 +219,12 @@ class Game:
             # change current player
             current_player = current_player.next_player()
         
-        return self.get_current_score()
+        return Statistics(
+            score = self.get_current_score(),
+            lives = self.lives,
+            hints = self.hints,
+            num_turns = len(self.turns)
+        )
         
         
 
