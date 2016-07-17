@@ -392,26 +392,31 @@ class Strategy:
                 self.log("discard useless card")
                 return card_pos
         
-        # TODO: se ci sono più possibilità, scegliere carte più alte / più probabilmente non giocabili
-        """
-        # then see if I can be sure to discard a non-relevant card
-        for (card_pos, p) in enumerate(self.possibilities):
-            if len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p):
-                self.log("discard non-relevant card")
-                return card_pos
-        """
-        # try to avoid cards that are surely relevant
-        best_card_pos = None
-        best_relevant_ratio = 2.0
+        # Try to avoid cards that are likely relevant, then choose cards that are more likely useless
+        tolerance = 1e-3
+        best_cards_pos = []
+        best_relevant_ratio = 1.0
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0:
                 num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
                 relevant_ratio = float(num_relevant) / len(p)
-                if relevant_ratio < best_relevant_ratio:
-                    best_card_pos, best_relevant_ratio = card_pos, relevant_ratio
+                
+                num_useful = sum(1 for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
+                useful_ratio = float(num_useful) / len(p)
+                
+                if relevant_ratio < best_relevant_ratio - tolerance:
+                    # better ratio found
+                    best_cards_pos, best_relevant_ratio = [], relevant_ratio
+                
+                if relevant_ratio < best_relevant_ratio + tolerance:
+                    # add this card to the possibilities
+                    best_cards_pos.append((useful_ratio, card_pos))
         
-        self.log("discard a card (relevant ratio %f)" % best_relevant_ratio)
-        return best_card_pos
+        assert len(best_cards_pos) > 0
+        useful_ratio, card_pos = sorted(best_cards_pos)[0]
+        
+        self.log("discard a card (relevant ratio ~%.3f, useful ratio %.3f)" % (best_relevant_ratio, useful_ratio))
+        return card_pos
     
     
     def get_best_play(self):
@@ -458,8 +463,7 @@ class Strategy:
             # discard card
             return Action(Action.DISCARD, card_pos=self.get_best_discard())
         
-        # TODO: forse non dare un suggerimento se non si riesce a suggerire nessuna carta giocabile
-        # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza
+        # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza, o se ha solo carte rilevanti
         
         # try to give indirect hint
         # try the two possible number_hint values
@@ -498,15 +502,17 @@ class Strategy:
                     num_useful = sum(1 for card in involved_cards if card.useful(self.board, self.full_deck, self.discard_pile))
                     
                     # self.log("involved cards: " + involved_cards.__repr__())
-                    # self.log("there are %d relevant cards and %d playable cards" % (num_relevant, num_playable))
+                    # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
                     
                     # TODO: tener conto dei giocatori che eventualmente non giocheranno più
                     # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
-                    # give priority to playable cards, then to relevant cards, then to the number of cards
+                    # Give priority to playable cards, then to relevant cards, then to the number of cards.
                     # WARNING: it is important that the first parameter is the number of playable cards,
-                    # because other players obtain information from this
-                    possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
-                    # print number_hint, possibilities[number_hint], "involved cards:", involved_cards
+                    # because other players obtain information from this.
+                    # If the hint doesn't involve any useful card, avoid giving the hint.
+                    if num_useful > 0:
+                        possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
+        
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
@@ -519,7 +525,7 @@ class Strategy:
         else:
             # failed to give indirect hint
             # discard card
-            self.log("failed to give an indirect hint")
+            self.log("failed to give a hint")
             return Action(Action.DISCARD, card_pos=self.get_best_discard())
 
 
