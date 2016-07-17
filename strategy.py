@@ -120,15 +120,15 @@ class IndirectHintsManager:
         alternative_my_card_pos = alternative_cards_pos[self.id]
         alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board))
         
-        self.strategy.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        self.strategy.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        self.strategy.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
-            
-            self.strategy.log("EEEEEEEEEEEEEEEEE")
-            # TODO
+            # found a playable card and a non-playable card!
+            self.log("found playable card (%d) and non-playable card (%d)" % (my_card_pos, alternative_my_card_pos))
+            return my_card_pos, alternative_my_card_pos
         
         
 
@@ -347,8 +347,21 @@ class Strategy:
                                     # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
                                     p.remove(card)
                 
+            # infer playability of some cards, from the type of the given hint
+            res = self.indirect_hints_manager.infer_playable_cards(player_id, action)
+            
+            if res is not None:
+                # found a playable and a non-playable card
+                playable, non_playable = res
+                for card in self.full_deck:
+                    if card.playable(self.board) and card in self.possibilities[non_playable]:
+                        # self.log("removing " + card.__repr__() + " from position %d" % non_playable)
+                        self.possibilities[non_playable].remove(card)
+                    elif not card.playable(self.board) and card in self.possibilities[playable]:
+                        # self.log("removing " + card.__repr__() + " from position %d" % playable)
+                        self.possibilities[playable].remove(card)
+            
             # process indirect hint
-            self.indirect_hints_manager.infer_playable_cards(player_id, action)
             res = self.indirect_hints_manager.receive_hint(player_id, action)
             
             if res is not None:

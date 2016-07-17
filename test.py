@@ -24,4 +24,4 @@ print sorted(results)
 print "Average result:", float(sum(results)) / len(results)
 print "Best result:", max(results)
 print "Worst result:", min(results)
-print "Rate of perfect scores: %.2f\%" % float(results.count(30)) / len(results) * 100.0
+print "Rate of perfect scores: %.2f %%" % (float(results.count(30)) / len(results) * 100.0)
