@@ -26,7 +26,7 @@ class Knowledge:
 
 
 
-class IndirectHintsManager:
+class HintsManager:
     def __init__(self, num_players, k, id, strategy):
         self.num_players = num_players
         self.k = k
@@ -234,7 +234,7 @@ class Strategy:
         self.update_possibilities()
         
         # indirect hints manager
-        self.indirect_hints_manager = IndirectHintsManager(num_players, k, id, self)
+        self.hints_manager = HintsManager(num_players, k, id, self)
     
     
     def update(self, hints, lives, my_hand, turn, last_turn, deck_size):
@@ -311,7 +311,7 @@ class Strategy:
         if action.type in [Action.PLAY, Action.DISCARD]:
             # reset knowledge of the player
             new_card = self.my_hand[action.card_pos] if player_id == self.id else self.hands[player_id][action.card_pos]
-            self.indirect_hints_manager.reset_knowledge(player_id, action.card_pos, new_card is not None)
+            self.hints_manager.reset_knowledge(player_id, action.card_pos, new_card is not None)
             
             if player_id == self.id:
                 # check for my new card
@@ -348,7 +348,7 @@ class Strategy:
                                     p.remove(card)
                 
             # infer playability of some cards, from the type of the given hint
-            res = self.indirect_hints_manager.infer_playable_cards(player_id, action)
+            res = self.hints_manager.infer_playable_cards(player_id, action)
             
             if res is not None:
                 # found a playable and a non-playable card
@@ -362,7 +362,7 @@ class Strategy:
                         self.possibilities[playable].remove(card)
             
             # process indirect hint
-            res = self.indirect_hints_manager.receive_hint(player_id, action)
+            res = self.hints_manager.receive_hint(player_id, action)
             
             if res is not None:
                 card_pos, color, number = res
@@ -379,7 +379,7 @@ class Strategy:
         
         # print knowledge
         if self.debug and self.id == self.num_players-1:
-            self.indirect_hints_manager.print_knowledge()
+            self.hints_manager.print_knowledge()
     
     
     def get_best_discard(self):
@@ -467,10 +467,10 @@ class Strategy:
         
         for number_hint in [False, True]:
             # compute which cards would be involved in this indirect hint
-            cards_pos = self.indirect_hints_manager.choose_all_cards(self.id, self.turn, number_hint)
+            cards_pos = self.hints_manager.choose_all_cards(self.id, self.turn, number_hint)
             involved_cards = [self.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
             
-            res = self.indirect_hints_manager.compute_hint(self.turn, number_hint)
+            res = self.hints_manager.compute_hint(self.turn, number_hint)
             if res is not None:
                 color, number = res
             
@@ -491,7 +491,7 @@ class Strategy:
                 
                 if player_id is not None:
                     # found player to give the hint to
-                    involved_cards += [card for (card_pos, card) in enumerate(self.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.indirect_hints_manager.knowledge[player_id][card_pos].knows(number_hint)]
+                    involved_cards += [card for (card_pos, card) in enumerate(self.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.hints_manager.knowledge[player_id][card_pos].knows(number_hint)]
                     involved_cards = list(set(involved_cards))
                     num_relevant = sum(1 for card in involved_cards if card.relevant(self.board, self.full_deck, self.discard_pile))
                     num_playable = sum(1 for card in involved_cards if card.playable(self.board))
