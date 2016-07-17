@@ -184,8 +184,11 @@ class Game:
             print colored("%d" % self.board[color], Card.PRINTABLE_COLORS[color]),
         print
         print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), self.get_current_score())
+        
         if self.last_round:
             print "This is the last round (player %d plays last on turn %d)" % (self.last_player.id, self.last_turn)
+        else:
+            print
         
         print
 
