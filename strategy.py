@@ -382,6 +382,7 @@ class Strategy:
             self.hints_manager.print_knowledge()
     
     
+    
     def get_best_discard(self):
         """
         Choose the best card to be discarded.
@@ -393,6 +394,7 @@ class Strategy:
                 return card_pos
         
         # Try to avoid cards that are likely relevant, then choose cards that are more likely useless
+        # TODO: forse far pesare di più i 2 rilevanti, poi i 3, poi i 4, poi i 5
         tolerance = 1e-3
         best_cards_pos = []
         best_relevant_ratio = 1.0
@@ -423,9 +425,16 @@ class Strategy:
         """
         Choose the best card to play.
         """
-        # TODO: preferire carte basse e i 5 (perché danno indizi)
+        # I prefer playing cards that allow a higher number of playable cards.
+        # In case of tie, I prefer (in this order): NUM_NUMBERS, 1, 2, 3, ..., NUM_NUMBERS-1 (and I give weights accordingly).
+        
+        WEIGHT = {number: Card.NUM_NUMBERS - number for number in xrange(1, Card.NUM_NUMBERS)}
+        WEIGHT[Card.NUM_NUMBERS] = Card.NUM_NUMBERS
+        
+        tolerance = 1e-3
         best_card_pos = None
-        best_avg_num_playable = -1.0
+        best_avg_num_playable = -1.0    # average number of other playable cards, after my play
+        best_avg_weight = 0.0           # average weight (in the sense above)
         for (card_pos, p) in enumerate(self.possibilities):
             if all(card.playable(self.board) for card in p) and len(p) > 0:
                 # the card in this position is surely playable!
@@ -439,11 +448,14 @@ class Strategy:
                 
                 avg_num_playable = float(sum(num_playable)) / len(num_playable)
                 
-                if avg_num_playable > best_avg_num_playable:
-                    best_card_pos, best_avg_num_playable = card_pos, avg_num_playable
+                avg_weight = float(sum(WEIGHT[card.number] for card in p)) / len(p)
+                
+                if avg_num_playable > best_avg_num_playable + tolerance or avg_num_playable > best_avg_num_playable - tolerance and avg_weight > best_avg_weight:
+                    self.log("update card to be played, pos %d, score %f, %f" % (card_pos, avg_num_playable, avg_weight))
+                    best_card_pos, best_avg_num_playable, best_avg_weight = card_pos, avg_num_playable, avg_weight
         
         if best_card_pos is not None:
-            self.log("playing card in position %d gives %f playable cards on average" % (best_card_pos, best_avg_num_playable))
+            self.log("playing card in position %d gives %f playable cards on average and weight %f" % (best_card_pos, best_avg_num_playable, best_avg_weight))
         return best_card_pos
     
     
