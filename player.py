@@ -8,7 +8,7 @@ from strategy import Strategy
 
 
 class Player:
-    def __init__(self, id, game, hand, strategy_debug=False):
+    def __init__(self, id, game, hand, strategy_log=False):
         # my id (order of play)
         self.id = id
         
@@ -19,7 +19,7 @@ class Player:
         self.hand = hand
         
         # strategy object
-        self.strategy = Strategy(debug=strategy_debug)
+        self.strategy = Strategy(verbose=strategy_log)
     
     
     def __eq__(self, other):
