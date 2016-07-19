@@ -9,12 +9,13 @@ from card import Card, deck
 
 
 class Knowledge:
-    def __init__(self, color=False, number=False):
+    def __init__(self, color=False, number=False, one=False):
         self.color = color
         self.number = number
+        self.one = one  # knowledge about this card being a (likely) playable one
     
     def __repr__(self):
-        return ("C" if self.color else "-") + ("N" if self.number else "-")
+        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("O" if self.one else "-")
     
     
     def knows(self, number_hint=False):
@@ -39,6 +40,9 @@ class HintsManager:
     def log(self, message):
         self.strategy.log(message)
     
+    def is_first_round(self):
+        return self.strategy.turn < self.num_players
+
 
     def reset_knowledge(self, player_id, card_pos, new_card_exists):
         self.knowledge[player_id][card_pos] = Knowledge(False, False) if new_card_exists else Knowledge(True, True)
@@ -93,6 +97,9 @@ class HintsManager:
             # the hint was given to me, so I haven't enough information to infer something
             return None
         
+        if self.is_first_round():
+            # In the first round hints on 1s are natural, so it's better not to infer anything.
+            return None
         
         if number_hint:
             # the alternative hint would have been on colors
@@ -119,9 +126,9 @@ class HintsManager:
         alternative_my_card_pos = alternative_cards_pos[self.id]
         alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board))
         
-        # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
@@ -138,42 +145,56 @@ class HintsManager:
         number_hint = action.number_hint
         cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
         
-        # update knowledge
-        for (target_id, card_pos) in cards_pos.iteritems():
-            kn = self.knowledge[target_id][card_pos]
-            if number_hint:
+        if self.is_first_round() and action.number == 1:
+            # In the first round, hints on 1s are natural.
+            
+            # Update knowledge.
+            for card_pos in action.hinted_card_pos:
+                kn = self.knowledge[action.player_id][card_pos]
                 kn.number = True
-            else:
-                kn.color = True
+                kn.one = True
+                kn.color = True # he doesn't know the color, but he will play the one anyway
+            
+            return None
         
-        for card_pos in action.hinted_card_pos:
-            kn = self.knowledge[action.player_id][card_pos]
-            if number_hint:
-                kn.number = True
-            else:
-                kn.color = True
-        
-        # decode my hint
-        if self.id in cards_pos:
-            n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
-            my_card_pos = cards_pos[self.id]
-            modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
-            
-            involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
-            
-            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
-            my_value = (n - m) % modulo
-            
-            number = my_value if number_hint else None
-            if number == 0:
-                number = 5
-            color = Card.COLORS[my_value] if not number_hint else None
-            
-            return my_card_pos, color, number
         
         else:
-            # no hint (apparently I already know everything)
-            return None
+            # Update knowledge.
+            for (target_id, card_pos) in cards_pos.iteritems():
+                kn = self.knowledge[target_id][card_pos]
+                if number_hint:
+                    kn.number = True
+                else:
+                    kn.color = True
+            
+            for card_pos in action.hinted_card_pos:
+                kn = self.knowledge[action.player_id][card_pos]
+                if number_hint:
+                    kn.number = True
+                else:
+                    kn.color = True
+            
+            # Decode my hint.
+            if self.id in cards_pos:
+                n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
+                my_card_pos = cards_pos[self.id]
+                modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
+                
+                involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
+                
+                m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
+                my_value = (n - m) % modulo
+                
+                number = my_value if number_hint else None
+                if number == 0:
+                    number = 5
+                color = Card.COLORS[my_value] if not number_hint else None
+                
+                return my_card_pos, color, number
+            
+            else:
+                # No hint (apparently I already know everything).
+                return None
     
     
     
@@ -200,8 +221,55 @@ class HintsManager:
         return color, number
     
     
+    def get_best_hint_on_ones(self):
+        """
+        Returns the best natural hint on playable ones.
+        """
+        assert all(not kn.one for kn in self.knowledge[self.id])    # If I knew some 1, I should have played it.
+        
+        virtually_played = set()
+        
+        for color in Card.COLORS:
+            if self.strategy.board[color] >= 1:
+                # a 1 of that color was already played
+                virtually_played.add(color)
+        
+        for (player_id, knowledge) in enumerate(self.knowledge):
+            if player_id != self.id:
+                for (card_pos, kn) in enumerate(knowledge):
+                    if kn.one:
+                        # this player knows about a 1
+                        virtually_played.add(self.strategy.hands[player_id][card_pos].color)
+        
+        self.log("virtually played ones are " + virtually_played.__repr__())
+        
+        # analyze hands of other players
+        new_colors = {}
+        best = 0
+        best_player_id = None
+        for (player_id, hand) in self.strategy.hands.iteritems():
+            owned = [card.color for (card_pos, card) in enumerate(hand) if card.number == 1 and not self.knowledge[player_id][card_pos].one]
+            
+            if len(owned) == len(set(owned)) and all(color not in virtually_played for color in owned):
+                # this player is suitable for my hint!
+                new_colors[player_id] = owned
+                if len(owned) > best:
+                    best, best_player_id = len(owned), player_id
+        
+        # TODO: migliorare rispetto alla scelta greedy
+        if best_player_id is not None:
+            self.log("give natural hints on 1s to player %d (%d cards)" % (best_player_id, best))
+            return Action(Action.HINT, player_id=best_player_id, color=None, number=1)
+
+    
     def get_best_hint(self):
-        # try the two possible number_hint values
+        if self.is_first_round():
+            # Try to give a natural hint on 1s.
+            hint_action = self.get_best_hint_on_ones()
+            if hint_action is not None:
+                return hint_action
+        
+        # Try the two possible number_hint values.
         possibilities = {False: None, True: None}   # possibilities for number_hint, with results
         
         for number_hint in [False, True]:
@@ -248,6 +316,11 @@ class HintsManager:
                     if num_useful > 0:
                         possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
         
+        if self.is_first_round():
+            # Hints on 1s are natural in the first round.
+            if possibilities[True] is not None and possibilities[True][1].number == 1:
+                possibilities[True] = None
+        
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
@@ -259,6 +332,8 @@ class HintsManager:
         
         else:
             return None
+
+
 
 
 
@@ -483,6 +558,12 @@ class Strategy:
         """
         Choose the best card to play.
         """
+        # If I know a 1 is playable, I play it.
+        for (card_pos, kn) in enumerate(self.hints_manager.knowledge[self.id]):
+            if kn.one:
+                self.log("playing 1 in position %d" % card_pos)
+                return card_pos
+        
         # I prefer playing cards that allow a higher number of playable cards.
         # In case of tie, I prefer (in this order): NUM_NUMBERS, 1, 2, 3, ..., NUM_NUMBERS-1 (and I give weights accordingly).
         
@@ -495,6 +576,20 @@ class Strategy:
         best_avg_weight = 0.0           # average weight (in the sense above)
         for (card_pos, p) in enumerate(self.possibilities):
             if all(card.playable(self.board) for card in p) and len(p) > 0:
+                # check that the cards do not overlap with playable 1s of other players
+                
+                good = True
+                for (player_id, knowledge) in enumerate(self.hints_manager.knowledge):
+                    if player_id != self.id:
+                        for (card_pos, kn) in enumerate(knowledge):
+                            if kn.one and self.hands[player_id][card_pos] in p:
+                                good = False
+                
+                if not good:
+                    # some of my possible cards overlap with a playable one of someone else
+                    self.log("some of my possible cards overlap with a playable one of someone else")
+                    continue
+                
                 # the card in this position is surely playable!
                 
                 # how many cards of the other players become playable, on average?
