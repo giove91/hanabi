@@ -2,7 +2,8 @@ import sys
 
 from game import Game
 
-# TODO: read number of players from command line
+# TODO: aggiungere opzione -d per specificare su che file dumpare il mazzo
+# TODO: aggiungere opzione -h (help)
 
 if __name__ == "__main__":
     # default values
