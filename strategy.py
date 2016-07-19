@@ -394,6 +394,7 @@ class Strategy:
             for p in self.possibilities:
                 if card in p:
                     p.remove(card)
+        assert all(len(p) > 0 or self.my_hand[card_pos] is None for (card_pos, p) in enumerate(self.possibilities))
     
     def update_possibilities_with_combinations(self):
         # update possibilities examining all combinations of my hand
@@ -463,23 +464,26 @@ class Strategy:
                             # self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
                             p.remove(card)
             
-            else:
+            elif not self.hints_manager.is_first_round() and action.number != 1:
                 # maybe I wasn't given a hint because I didn't have the right cards
                 # recall: the hint is given to the first suitable person after the one who gives the hint
-                for i in range(player_id + 1, self.num_players) + range(player_id):
-                    if i == action.player_id:
-                        # reached hinted player
-                        break
-                    
-                    elif i == self.id:
-                        # I was reached first!
-                        # I am between the hinter and the hinted player!
-                        for (i, p) in enumerate(self.possibilities):
-                            for card in self.full_deck:
-                                if not card.matches_hint(action, -1) and card in p:
-                                    # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
-                                    p.remove(card)
                 
+                # avoid this thing if the hint is about 1s
+                if action.number != 1:
+                    for i in range(player_id + 1, self.num_players) + range(player_id):
+                        if i == action.player_id:
+                            # reached hinted player
+                            break
+                        
+                        elif i == self.id:
+                            # I was reached first!
+                            # I am between the hinter and the hinted player!
+                            for (i, p) in enumerate(self.possibilities):
+                                for card in self.full_deck:
+                                    if not card.matches_hint(action, -1) and card in p:
+                                        # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
+                                        p.remove(card)
+            
             # infer playability of some cards, from the type of the given hint
             res = self.hints_manager.infer_playable_cards(player_id, action)
             
@@ -505,7 +509,6 @@ class Strategy:
                 for card in self.full_deck:
                     if not card.matches(color=color, number=number) and card in p:
                         p.remove(card)
-        
         
         # update possibilities with visible cards
         self.update_possibilities()
@@ -581,8 +584,8 @@ class Strategy:
                 good = True
                 for (player_id, knowledge) in enumerate(self.hints_manager.knowledge):
                     if player_id != self.id:
-                        for (card_pos, kn) in enumerate(knowledge):
-                            if kn.one and self.hands[player_id][card_pos] in p:
+                        for (c_pos, kn) in enumerate(knowledge):
+                            if kn.one and self.hands[player_id][c_pos] in p:
                                 good = False
                 
                 if not good:
