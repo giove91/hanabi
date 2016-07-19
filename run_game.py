@@ -7,7 +7,7 @@ from game import Game
 if __name__ == "__main__":
     # default values
     wait_key = True
-    num_players = 4
+    num_players = 5
     log = True
     strategy_debug = False
     
