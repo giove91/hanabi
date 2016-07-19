@@ -27,6 +27,11 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         load_deck_from = sys.argv[i+1]
     
+    if '-n' in sys.argv[1:]:
+        # read number of players
+        i = sys.argv.index('-n')
+        assert len(sys.argv) >= i+2
+        num_players = int(sys.argv[i+1])
     
     # run game
     print "Starting game with %d players..." % num_players
