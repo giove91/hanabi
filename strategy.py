@@ -257,9 +257,12 @@ class HintsManager:
                     best, best_player_id = len(owned), player_id
         
         # TODO: migliorare rispetto alla scelta greedy
-        if best_player_id is not None:
+        if best_player_id is not None and best >= 3:
             self.log("give natural hints on 1s to player %d (%d cards)" % (best_player_id, best))
             return Action(Action.HINT, player_id=best_player_id, color=None, number=1)
+        
+        else:
+            return None
 
     
     def get_best_hint(self):
