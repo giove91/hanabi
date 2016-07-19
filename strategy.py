@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import random
 import itertools
 import copy
 
@@ -210,9 +209,9 @@ class Strategy:
     It only has the knowledge of that player, and it must make decisions.
     """
     
-    def __init__(self, debug=False):
+    def __init__(self, verbose=False):
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
-        self.debug = debug
+        self.verbose = verbose
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
@@ -378,7 +377,7 @@ class Strategy:
         self.update_possibilities()
         
         # print knowledge
-        if self.debug and self.id == self.num_players-1:
+        if self.verbose and self.id == self.num_players-1:
             self.hints_manager.print_knowledge()
     
     
@@ -544,7 +543,7 @@ class Strategy:
 
     
     def log(self, message):
-        if self.debug:
+        if self.verbose:
             print "Player %d: %s" % (self.id, message)
 
 

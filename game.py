@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
+import sys
 import random
 from collections import namedtuple
 from termcolor import colored
@@ -22,30 +22,42 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, wait_key=True, log=True, strategy_debug=False):
+    def __init__(self, num_players, wait_key=True, log=True, strategy_log=False, dump_deck_to=None, load_deck_from=None):
         self.num_players = num_players
-        self.wait_key = wait_key
-        self.log = log
-        self.strategy_debug = strategy_debug
+        
+        self.wait_key = wait_key    # press Enter to advance turn
+        self.log = log              # log advancement of the game to standard output
+        self.strategy_log = strategy_log    # log messages from strategy to standard output
+        self.dump_deck_to = dump_deck_to    # if not None, dump the initial deck to the given file
+        self.load_deck_from = load_deck_from    # if not None, load the initial deck from the given file
         
         # compute number of cards per player
         self.k = self.CARDS_PER_PLAYER[num_players]
     
     
-    
     def setup(self):
-        # construct deck
-        self.deck = deck()
+        if self.load_deck_from is None:
+            # construct deck
+            self.deck = deck()
+            
+            # shuffle deck
+            random.shuffle(self.deck)
         
-        # shuffle deck
-        random.shuffle(self.deck)
+        else:
+            # use given deck
+            self.load_deck(self.load_deck_from)
+            assert set(self.deck) == set(deck())
+        
+        if self.dump_deck_to is not None:
+            # dump initial deck to file
+            self.dump_deck(self.dump_deck_to)
         
         # initialize players, with initial hand of cards
         self.players = [Player(
                 id = i,
                 game = self,
                 hand = [self.draw_card_from_deck() for i in xrange(self.k)],
-                strategy_debug = self.strategy_debug
+                strategy_log = self.strategy_log
             ) for i in xrange(self.num_players)]
         
         # set number of hints and lives
@@ -191,6 +203,37 @@ class Game:
             print
         
         print
+
+
+    def log_deck(self):
+        print "Deck (last card on top):"
+        print self.deck
+        print
+
+
+    def dump_deck(self, filename):
+        """
+        Dump the initial deck to file.
+        """
+        print "Dumping initial deck to %s" % filename
+        file = open(filename, "w")
+        
+        # dump deck
+        for card in self.deck:
+            print >> file, "%d %s %d" % (card.number, card.color, card.id)
+    
+    
+    def load_deck(self, filename):
+        """
+        Load the initial deck from file.
+        """
+        print "Loading initial deck from %s" % filename
+        file = open(filename, "r")
+        
+        self.deck = []
+        for line in file:
+            number, color, id = line.split()
+            self.deck.append(Card(id=int(id), color=color, number=int(number)))
 
     
     def run_game(self):
