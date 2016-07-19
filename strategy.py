@@ -584,16 +584,18 @@ class Strategy:
             if all(card.playable(self.board) for card in p) and len(p) > 0:
                 # check that the cards do not overlap with playable 1s of other players
                 
+                # self.log("checking if card in position %d does not overlap..." % card_pos)
                 good = True
                 for (player_id, knowledge) in enumerate(self.hints_manager.knowledge):
                     if player_id != self.id:
                         for (c_pos, kn) in enumerate(knowledge):
-                            if kn.one and self.hands[player_id][c_pos] in p:
+                            # self.log("[position %d] checking player %d, card in position %d, kn.one %r, card %r, card in p %r" % (card_pos, player_id, c_pos, kn.one, self.hands[player_id][c_pos], self.hands[player_id][c_pos] in p))
+                            if kn.one and any(card.equals(self.hands[player_id][c_pos]) for card in p):
                                 good = False
                 
                 if not good:
                     # some of my possible cards overlap with a playable one of someone else
-                    self.log("some of my possible cards overlap with a playable one of someone else")
+                    self.log("some of my possible cards overlap with a playable 1 of someone else")
                     continue
                 
                 # the card in this position is surely playable!

@@ -34,6 +34,7 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         num_players = int(sys.argv[i+1])
     
+    
     # run game
     print "Starting game with %d players..." % num_players
     print
@@ -51,3 +52,5 @@ if __name__ == "__main__":
     statistics = game.run_game()
     
     print statistics
+
+
