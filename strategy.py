@@ -97,10 +97,11 @@ class HintsManager:
             # the hint was given to me, so I haven't enough information to infer something
             return None
         
+        """
         if self.is_first_round():
             # In the first round hints on 1s are natural, so it's better not to infer anything.
             return None
-        
+        """
         if number_hint:
             # the alternative hint would have been on colors
             visible_colors = set(card.color for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
@@ -145,6 +146,7 @@ class HintsManager:
         number_hint = action.number_hint
         cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
         
+        """
         if self.is_first_round() and action.number == 1:
             # In the first round, hints on 1s are natural.
             
@@ -156,45 +158,44 @@ class HintsManager:
                 kn.color = True # he doesn't know the color, but he will play the one anyway
             
             return None
+        """
+    
+        # Update knowledge.
+        for (target_id, card_pos) in cards_pos.iteritems():
+            kn = self.knowledge[target_id][card_pos]
+            if number_hint:
+                kn.number = True
+            else:
+                kn.color = True
         
+        for card_pos in action.hinted_card_pos:
+            kn = self.knowledge[action.player_id][card_pos]
+            if number_hint:
+                kn.number = True
+            else:
+                kn.color = True
+        
+        # Decode my hint.
+        if self.id in cards_pos:
+            n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
+            my_card_pos = cards_pos[self.id]
+            modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
+            
+            involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
+            
+            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
+            my_value = (n - m) % modulo
+            
+            number = my_value if number_hint else None
+            if number == 0:
+                number = 5
+            color = Card.COLORS[my_value] if not number_hint else None
+            
+            return my_card_pos, color, number
         
         else:
-            # Update knowledge.
-            for (target_id, card_pos) in cards_pos.iteritems():
-                kn = self.knowledge[target_id][card_pos]
-                if number_hint:
-                    kn.number = True
-                else:
-                    kn.color = True
-            
-            for card_pos in action.hinted_card_pos:
-                kn = self.knowledge[action.player_id][card_pos]
-                if number_hint:
-                    kn.number = True
-                else:
-                    kn.color = True
-            
-            # Decode my hint.
-            if self.id in cards_pos:
-                n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
-                my_card_pos = cards_pos[self.id]
-                modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
-                
-                involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
-                
-                m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
-                my_value = (n - m) % modulo
-                
-                number = my_value if number_hint else None
-                if number == 0:
-                    number = 5
-                color = Card.COLORS[my_value] if not number_hint else None
-                
-                return my_card_pos, color, number
-            
-            else:
-                # No hint (apparently I already know everything).
-                return None
+            # No hint (apparently I already know everything).
+            return None
     
     
     
@@ -269,12 +270,13 @@ class HintsManager:
         """
         Choose the best hint to give, if any.
         """
+        """
         if self.is_first_round():
             # Try to give a natural hint on 1s.
             hint_action = self.get_best_hint_on_ones()
             if hint_action is not None:
                 return hint_action
-        
+        """
         # Try the two possible number_hint values.
         possibilities = {False: None, True: None}   # possibilities for number_hint, with results
         
@@ -322,11 +324,12 @@ class HintsManager:
                     if num_useful > 0:
                         possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
         
+        """
         if self.is_first_round():
             # Hints on 1s are natural in the first round.
             if possibilities[True] is not None and possibilities[True][1].number == 1:
                 possibilities[True] = None
-        
+        """
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
@@ -470,25 +473,27 @@ class Strategy:
                             # self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
                             p.remove(card)
             
-            elif not self.hints_manager.is_first_round() and action.number != 1:
+            else:
+                """
+                elif not self.hints_manager.is_first_round() and action.number != 1:
+                """
+            
                 # maybe I wasn't given a hint because I didn't have the right cards
                 # recall: the hint is given to the first suitable person after the one who gives the hint
                 
-                # avoid this thing if the hint is about 1s
-                if action.number != 1:
-                    for i in range(player_id + 1, self.num_players) + range(player_id):
-                        if i == action.player_id:
-                            # reached hinted player
-                            break
-                        
-                        elif i == self.id:
-                            # I was reached first!
-                            # I am between the hinter and the hinted player!
-                            for (i, p) in enumerate(self.possibilities):
-                                for card in self.full_deck:
-                                    if not card.matches_hint(action, -1) and card in p:
-                                        # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
-                                        p.remove(card)
+                for i in range(player_id + 1, self.num_players) + range(player_id):
+                    if i == action.player_id:
+                        # reached hinted player
+                        break
+                    
+                    elif i == self.id:
+                        # I was reached first!
+                        # I am between the hinter and the hinted player!
+                        for (i, p) in enumerate(self.possibilities):
+                            for card in self.full_deck:
+                                if not card.matches_hint(action, -1) and card in p:
+                                    # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
+                                    p.remove(card)
             
             # infer playability of some cards, from the type of the given hint
             res = self.hints_manager.infer_playable_cards(player_id, action)
