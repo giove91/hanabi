@@ -175,7 +175,8 @@ class Game:
         action = turn.action
         print "Turn %d (player %d):" % (self.get_current_turn(), player.id),
         if action.type in [Action.PLAY, Action.DISCARD]:
-            print action.type, self.discard_pile[-1], "(card %d)" % action.card_pos
+            print action.type, self.discard_pile[-1], "(card %d)," % action.card_pos,
+            print "draw %r" % player.hand[action.card_pos]
         
         elif action.type == Action.HINT:
             print action.type,
