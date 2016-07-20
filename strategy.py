@@ -56,7 +56,12 @@ class HintsManager:
             print
         print
 
-
+    
+    def shift(self, turn):
+        # a "random" shift in the hint
+        return turn + turn / self.num_players
+    
+    
     def choose_card(self, player_id, target_id, turn, number_hint):
         # choose which of the target's cards receive a hint from the current player in the given turn
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.number if number_hint else kn.color)]
@@ -183,7 +188,7 @@ class HintsManager:
             
             involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
             
-            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards)
+            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(action.turn)
             my_value = (n - m) % modulo
             
             number = my_value if number_hint else None
@@ -212,7 +217,8 @@ class HintsManager:
         # compute sum of visible cards in the given positions
         modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
         involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i in cards_pos]
-        m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) % modulo
+        m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(turn)
+        m %= modulo
         
         number = m if number_hint else None
         if number == 0:
@@ -659,21 +665,21 @@ class Strategy:
         if self.hints <= 1 and self.deck_size >= 2:
             # better to discard if the next player has many important cards
             self.log("there is only one hint, should I discard?")
-            card_pos, relevant_ratio, useful_ratio = self.get_best_discard()
+            card_pos, relevant_weight, useful_weight = self.get_best_discard()
             tolerance = 1e-3
             
-            if useful_ratio < tolerance:
+            if useful_weight < tolerance:
                 # discard is surely good
                 return Action(Action.DISCARD, card_pos=card_pos)
             
             elif all(card.relevant(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
-                if relevant_ratio < 0.5:
+                if relevant_weight < 0.5 + tolerance:
                     # close your eyes and discard
                     self.log("next player has only relevant cards, so I discard")
                     return Action(Action.DISCARD, card_pos=card_pos)
             
             elif all(card.useful(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
-                if relevant_ratio < tolerance and useful_ratio < 0.5:
+                if relevant_weight < tolerance and useful_weight < 1.0 + tolerance:
                     # discard anyway
                     self.log("next player has only useful cards, so I discard")
                     return Action(Action.DISCARD, card_pos=card_pos)
