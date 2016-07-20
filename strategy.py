@@ -321,8 +321,6 @@ class HintsManager:
                     # self.log("involved cards: " + involved_cards.__repr__())
                     # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
                     
-                    # TODO: tener conto dei giocatori che eventualmente non giocheranno più
-                    # TODO: in generale, gestire in modo più preciso la parte finale della partita (quanto si sa quasi tutto)
                     # Give priority to playable cards, then to relevant cards, then to the number of cards.
                     # WARNING: it is important that the first parameter is the number of playable cards,
                     # because other players obtain information from this.
@@ -588,12 +586,13 @@ class Strategy:
         """
         Choose the best card to play.
         """
+        """
         # If I know a 1 is playable, I play it.
         for (card_pos, kn) in enumerate(self.hints_manager.knowledge[self.id]):
             if kn.one:
                 self.log("playing 1 in position %d" % card_pos)
                 return card_pos
-        
+        """
         # I prefer playing cards that allow a higher number of playable cards.
         # In case of tie, I prefer (in this order): NUM_NUMBERS, 1, 2, 3, ..., NUM_NUMBERS-1 (and I give weights accordingly).
         
@@ -644,24 +643,89 @@ class Strategy:
         return best_card_pos
     
     
+    def get_best_play_last_round(self):
+        """
+        Choose the best card to play in the last round of the game.
+        The players know almost everything, and it is reasonable to examine all the possibilities.
+        """
+        best_card_pos = None
+        best_avg_score = 0.0
+        
+        for (card_pos, p) in enumerate(self.possibilities):
+            if any(card.playable(self.board) for card in p):
+                # at least a card (among the possible ones in this position) is playable
+                
+                obtained_scores = []
+                
+                for card in p:
+                    # simulate what happens if I play this card
+                    best_score = 0
+                    for comb in itertools.product(range(self.k), repeat = self.last_turn - self.turn):
+                        turn = self.turn
+                        board = copy.copy(self.board)
+                        player_id = self.id
+                        lives = self.lives
+                        
+                        if card.playable(board):
+                            board[card.color] += 1
+                        else:
+                            lives -= 1
+                        
+                        if lives >= 1:
+                            # simulate other players
+                            for (i, c_pos) in enumerate(comb):
+                                turn += 1
+                                player_id = (player_id + 1) % self.num_players
+                                
+                                # this player plays the card in position c_pos
+                                c = self.hands[player_id][c_pos]
+                                if c.playable(board):
+                                    board[c.color] += 1
+                        
+                        score = sum(board.itervalues())
+                        best_score = max(score, best_score) # assume that the other players play optimally! :)
+                    
+                    # self.log("simulation for card %r in position %d gives best score %d" % (card, card_pos, best_score))
+                    obtained_scores.append(best_score)
+                
+                avg_score = float(sum(obtained_scores)) / len(obtained_scores)
+                self.log("playing card in position %d gives an average score of %.3f" % (card_pos, avg_score))
+                
+                if avg_score > best_avg_score:
+                    best_card_pos, best_avg_score = card_pos, avg_score
+        
+        if best_card_pos is not None:
+            self.log("playing card in position %d is the best choice" % best_card_pos)
+            return best_card_pos
+
     
     def get_turn_action(self):
         # update possibilities checking all combinations
         if self.deck_size < 10:
             self.update_possibilities_with_combinations()
         
-        # check for playable cards in my hand
-        card_pos = self.get_best_play()
-        if card_pos is not None:
-            # play the card
-            return Action(Action.PLAY, card_pos=card_pos)
+        # if this is the last round, play accordingly
+        if self.last_turn is not None:
+            card_pos = self.get_best_play_last_round()
+            if card_pos is not None:
+                # play the card
+                return Action(Action.PLAY, card_pos=card_pos)
         
+        else:
+            # check for playable cards in my hand
+            card_pos = self.get_best_play()
+            if card_pos is not None:
+                # play the card
+                return Action(Action.PLAY, card_pos=card_pos)
+        
+        
+            
         
         if self.hints == 0:
             # discard card
             return Action(Action.DISCARD, card_pos=self.get_best_discard()[0])
         
-        # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza, o se ha solo carte rilevanti
+        
         if self.hints <= 1 and self.deck_size >= 2:
             # better to discard if the next player has many important cards
             self.log("there is only one hint, should I discard?")
