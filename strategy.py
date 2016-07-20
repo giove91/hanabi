@@ -535,37 +535,42 @@ class Strategy:
                 self.log("discard useless card")
                 return card_pos, 0.0, 0.0
         
-        # Try to avoid cards that are likely relevant, then choose cards that are more likely useless
-        # TODO: forse far pesare di più i 2 rilevanti, poi i 3, poi i 4, poi i 5
+        # Try to avoid cards that are (on average) more relevant, then choose cards that are (on average) less useful
         tolerance = 1e-3
         best_cards_pos = []
         best_relevant_ratio = 1.0
         
         WEIGHT = {number: Card.NUM_NUMBERS + 1 - number for number in xrange(1, Card.NUM_NUMBERS + 1)}
+        best_relevant_weight = max(WEIGHT.itervalues())
         
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0:
                 num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
-                weight_relevant = sum(WEIGHT[card.number] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                relevant_weight_sum = sum(WEIGHT[card.number] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
                 
                 relevant_ratio = float(num_relevant) / len(p)
+                relevant_weight = float(relevant_weight_sum) / len(p)
                 
                 num_useful = sum(1 for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
+                useful_weight_sum = sum(WEIGHT[card.number] for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
                 useful_ratio = float(num_useful) / len(p)
+                useful_weight = float(useful_weight_sum) / len(p)
                 
-                if relevant_ratio < best_relevant_ratio - tolerance:
-                    # better ratio found
-                    best_cards_pos, best_relevant_ratio = [], relevant_ratio
                 
-                if relevant_ratio < best_relevant_ratio + tolerance:
+                if relevant_weight < best_relevant_weight - tolerance:
+                    # better weight found
+                    best_cards_pos, best_relevant_weight, = [], relevant_weight
+                
+                if relevant_weight < best_relevant_weight + tolerance:
                     # add this card to the possibilities
-                    best_cards_pos.append((useful_ratio, card_pos))
+                    # self.log("new possibility for discard, pos %d, cards %r, useful weight %.3f" % (card_pos, p, useful_weight))
+                    best_cards_pos.append((useful_weight, card_pos))
         
         assert len(best_cards_pos) > 0
-        useful_ratio, card_pos = sorted(best_cards_pos)[0]
+        useful_weight, card_pos = sorted(best_cards_pos)[0]
         
-        self.log("discard a card (relevant ratio ~%.3f, useful ratio %.3f)" % (best_relevant_ratio, useful_ratio))
-        return card_pos, relevant_ratio, useful_ratio
+        self.log("discard a card (relevant weight ~%.3f, useful weight %.3f)" % (best_relevant_weight, useful_weight))
+        return card_pos, relevant_weight, useful_weight
     
     
     def get_best_play(self):
