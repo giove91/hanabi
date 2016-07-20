@@ -126,9 +126,9 @@ class HintsManager:
         alternative_my_card_pos = alternative_cards_pos[self.id]
         alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board))
         
-        self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
@@ -533,16 +533,21 @@ class Strategy:
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p):
                 self.log("discard useless card")
-                return card_pos
+                return card_pos, 0.0, 0.0
         
         # Try to avoid cards that are likely relevant, then choose cards that are more likely useless
         # TODO: forse far pesare di più i 2 rilevanti, poi i 3, poi i 4, poi i 5
         tolerance = 1e-3
         best_cards_pos = []
         best_relevant_ratio = 1.0
+        
+        WEIGHT = {number: Card.NUM_NUMBERS + 1 - number for number in xrange(1, Card.NUM_NUMBERS + 1)}
+        
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0:
                 num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                weight_relevant = sum(WEIGHT[card.number] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                
                 relevant_ratio = float(num_relevant) / len(p)
                 
                 num_useful = sum(1 for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
@@ -560,7 +565,7 @@ class Strategy:
         useful_ratio, card_pos = sorted(best_cards_pos)[0]
         
         self.log("discard a card (relevant ratio ~%.3f, useful ratio %.3f)" % (best_relevant_ratio, useful_ratio))
-        return card_pos
+        return card_pos, relevant_ratio, useful_ratio
     
     
     def get_best_play(self):
@@ -638,9 +643,31 @@ class Strategy:
         
         if self.hints == 0:
             # discard card
-            return Action(Action.DISCARD, card_pos=self.get_best_discard())
+            return Action(Action.DISCARD, card_pos=self.get_best_discard()[0])
         
         # TODO: forse è meglio scartare se quello dopo ha carte rilevanti di cui non è a conoscenza, o se ha solo carte rilevanti
+        if self.hints <= 1 and self.deck_size >= 2:
+            # better to discard if the next player has many important cards
+            self.log("there is only one hint, should I discard?")
+            card_pos, relevant_ratio, useful_ratio = self.get_best_discard()
+            tolerance = 1e-3
+            
+            if useful_ratio < tolerance:
+                # discard is surely good
+                return Action(Action.DISCARD, card_pos=card_pos)
+            
+            elif all(card.relevant(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
+                if relevant_ratio < 0.5:
+                    # close your eyes and discard
+                    self.log("next player has only relevant cards, so I discard")
+                    return Action(Action.DISCARD, card_pos=card_pos)
+            
+            elif all(card.useful(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
+                if relevant_ratio < tolerance and useful_ratio < 0.5:
+                    # discard anyway
+                    self.log("next player has only useful cards, so I discard")
+                    return Action(Action.DISCARD, card_pos=card_pos)
+        
         
         # try to give indirect hint
         hint_action = self.hints_manager.get_best_hint()
@@ -651,7 +678,7 @@ class Strategy:
             # failed to give indirect hint
             # discard card
             self.log("failed to give a hint")
-            return Action(Action.DISCARD, card_pos=self.get_best_discard())
+            return Action(Action.DISCARD, card_pos=self.get_best_discard()[0])
 
 
 

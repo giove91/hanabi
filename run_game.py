@@ -14,6 +14,7 @@ if __name__ == "__main__":
     dump_deck_to = "deck.txt"
     load_deck_from = None
     
+    repeat = None  # repeat until a bad result is reached
     
     # read options
     if '-c' in sys.argv[1:]:
@@ -34,23 +35,43 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         num_players = int(sys.argv[i+1])
     
+    if '-r' in sys.argv[1:]:
+        # repeat until a bad score is reached
+        i = sys.argv.index('-r')
+        assert len(sys.argv) >= i+2
+        repeat = int(sys.argv[i+1])
     
-    # run game
-    print "Starting game with %d players..." % num_players
-    print
-    game = Game(
-            num_players=num_players,
-            wait_key=wait_key,
-            log=log,
-            strategy_log=strategy_log,
-            dump_deck_to=dump_deck_to,
-            load_deck_from=load_deck_from,
-        )
+    counter = 0
+    while True:
+        # run game
+        print "Starting game with %d players..." % num_players
+        print
+        game = Game(
+                num_players=num_players,
+                wait_key=wait_key,
+                log=log,
+                strategy_log=strategy_log,
+                dump_deck_to=dump_deck_to,
+                load_deck_from=load_deck_from,
+            )
 
-    game.setup()
-    game.log_deck()
-    statistics = game.run_game()
-    
-    print statistics
+        game.setup()
+        game.log_deck()
+        statistics = game.run_game()
+        
+        print statistics
+        counter += 1
+        
+        if repeat is None:
+            break
+        
+        elif statistics.score <= repeat:
+            print "Reached score <= %d after %d games" % (repeat, counter)
+            break
+        
+        else:
+            print
+            print "=========================="
+            print
 
 
