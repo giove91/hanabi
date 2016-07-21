@@ -61,6 +61,25 @@ class HintsManager:
         return turn + turn / self.num_players
     
     
+    def is_duplicate(self, card):
+        # says if the given card is owned by some player who knows everything about it
+        
+        # check other players
+        for (player_id, hand) in self.strategy.hands.iteritems():
+            for card_pos in xrange(self.k):
+                kn = self.knowledge[player_id][card_pos]
+                if kn.color and kn.number and hand[card_pos] is not None and hand[card_pos].equals(card):
+                    return True
+        
+        # check my hand
+        for card_pos in xrange(self.k):
+            kn = self.knowledge[self.id][card_pos]
+            if kn.color and kn.number and any(card.equals(c) for c in self.strategy.possibilities[card_pos]):
+                return True
+        
+        return False
+    
+    
     def choose_card(self, player_id, target_id, turn, number_hint):
         # choose which of the target's cards receive a hint from the current player in the given turn
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.number if number_hint else kn.color)]
@@ -125,15 +144,15 @@ class HintsManager:
         
         involved_cards = list(set(involved_cards))
         my_card_pos = cards_pos[self.id]
-        num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board))
+        num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
         
         alternative_involved_cards = [hand[alternative_cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in alternative_cards_pos]
         alternative_my_card_pos = alternative_cards_pos[self.id]
-        alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board))
+        alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
         
-        # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
@@ -313,9 +332,10 @@ class HintsManager:
                     # found player to give the hint to
                     involved_cards += [card for (card_pos, card) in enumerate(self.strategy.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.knowledge[player_id][card_pos].knows(number_hint)]
                     involved_cards = list(set(involved_cards))
-                    num_relevant = sum(1 for card in involved_cards if card.relevant(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile))
-                    num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board))
-                    num_useful = sum(1 for card in involved_cards if card.useful(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile))
+                    
+                    num_relevant = sum(1 for card in involved_cards if card.relevant(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile) and not self.is_duplicate(card))
+                    num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
+                    num_useful = sum(1 for card in involved_cards if card.useful(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile) and not self.is_duplicate(card))
                     
                     # self.log("involved cards: " + involved_cards.__repr__())
                     # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
@@ -505,10 +525,10 @@ class Strategy:
                 # found a playable and a non-playable card
                 playable, non_playable = res
                 for card in self.full_deck:
-                    if card.playable(self.board) and card in self.possibilities[non_playable]:
+                    if card.playable(self.board) and card in self.possibilities[non_playable] and not self.hints_manager.is_duplicate(card):
                         # self.log("removing " + card.__repr__() + " from position %d" % non_playable)
                         self.possibilities[non_playable].remove(card)
-                    elif not card.playable(self.board) and card in self.possibilities[playable]:
+                    elif not card.playable(self.board) and card in self.possibilities[playable] and not self.hints_manager.is_duplicate(card):
                         # self.log("removing " + card.__repr__() + " from position %d" % playable)
                         self.possibilities[playable].remove(card)
             
