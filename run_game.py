@@ -29,6 +29,12 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         load_deck_from = sys.argv[i+1]
     
+    if '-d' in sys.argv[1:]:
+        # dump deck to file
+        i = sys.argv.index('-d')
+        assert len(sys.argv) >= i+2
+        dump_deck_to = sys.argv[i+1]
+    
     if '-n' in sys.argv[1:]:
         # read number of players
         i = sys.argv.index('-n')

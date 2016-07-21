@@ -25,7 +25,6 @@ class Knowledge:
             return self.color
 
 
-
 class HintsManager:
     def __init__(self, num_players, k, id, strategy):
         self.num_players = num_players
