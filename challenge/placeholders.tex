@@ -1,0 +1,67 @@
+\documentclass[a4paper,20pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{extsizes}
+\usepackage{adforn}
+\usepackage{fourier-orns}
+
+
+\newcommand{\placeholder}[2]{
+  \begin{center}
+    \hrule\vskip0.5cm
+    \phantom{\Huge\sc #1}
+    \vskip1cm
+    \phantom{\large\sc \decofourleft\ Team #2 \decofourright}
+    \vskip0.5cm
+    \hrule\vskip0.5cm
+    {\Huge\sc #1}
+    \vskip1cm
+    {\large\sc \decofourleft\ Team #2 \decofourright}
+    \vskip0.5cm\hrule
+  \end{center}
+}
+
+\pagenumbering{gobble}
+
+\begin{document}
+
+\placeholder{Player 0}{Carducci}
+\placeholder{Player 1}{Carducci}
+
+\pagebreak
+
+\placeholder{Player 2}{Carducci}
+\placeholder{Player 3}{Carducci}
+
+\pagebreak
+
+\placeholder{Player 4}{Carducci}
+\placeholder{strategy.py}{AlphaHanabi}
+
+\pagebreak
+
+\begin{center}
+  {\Large\sc Results}
+  \vskip1cm
+  
+  {\sc
+  \def\arraystretch{1.5}
+  \begin{tabular}{|c|c|c|}
+    \hline
+    Game & Carducci & AlphaHanabi \\
+    \hline
+    \hline
+    0 & \phantom{AlphaHanabi} & \phantom{AlphaHanabi} \\
+    \hline
+    1 & & \\
+    \hline
+    2 & & \\
+    \hline
+    3 & & \\
+    \hline
+    4 & & \\
+    \hline
+  \end{tabular}
+  }
+\end{center}
+
+\end{document}
