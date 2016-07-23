@@ -150,9 +150,9 @@ class HintsManager:
         alternative_my_card_pos = alternative_cards_pos[self.id]
         alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
         
-        self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
+        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
+        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
@@ -550,7 +550,7 @@ class Strategy:
         # print knowledge
         if self.verbose and self.id == self.num_players-1:
             self.hints_manager.print_knowledge()
-    
+
     
     
     def get_best_discard(self):
