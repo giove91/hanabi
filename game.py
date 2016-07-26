@@ -102,21 +102,19 @@ class Game:
         else:
             return None
     
+    
     def increment_hints(self):
         self.hints += 1
         self.hints = min(self.hints, self.MAX_HINTS)
-    
     
     def decrement_hints(self):
         if self.hints == 0:
             raise Exception("No hints available")
         self.hints -= 1
     
-    
     def decrement_lives(self):
         self.lives -= 1
         return self.lives == 0
-    
     
     
     def run_turn(self, player):

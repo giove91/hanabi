@@ -2,7 +2,6 @@ import sys
 
 from game import Game
 
-# TODO: aggiungere opzione -d per specificare su che file dumpare il mazzo
 # TODO: aggiungere opzione -h (help)
 
 if __name__ == "__main__":

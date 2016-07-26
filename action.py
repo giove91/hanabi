@@ -8,7 +8,11 @@ class Action:
     DISCARD = 'Discard'
     HINT = 'Hint'
     
+    COLOR = 'C'
+    NUMBER = 'N'
+    
     TYPES = [PLAY, DISCARD, HINT]
+    HINT_TYPES = [COLOR, NUMBER]
     
     
     def __init__(self, type, card_pos=None, player_id=None, color=None, number=None):
@@ -31,6 +35,9 @@ class Action:
         self.player_id = player_id
         self.color = color
         self.number = number
+        
+        if type == self.HINT:
+            self.hint_type = self.COLOR if color is not None else self.NUMBER
     
     
     def apply(self, game):
@@ -42,6 +49,7 @@ class Action:
             self.hinted_card_pos = [i for (i, card) in enumerate(player.hand) if card is not None and (card.number == self.number or card.color == self.color)]
             assert len(self.hinted_card_pos) > 0
             
+            # FIXME deprecated! use self.hint_type instead!
             self.number_hint = self.number is not None  # boolean variable to know if the hint is about numbers or colors
 
 
