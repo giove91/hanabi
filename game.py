@@ -157,9 +157,9 @@ class Game:
             # check for correctness
             target = self.players[action.player_id]
             assert player != target
-            if action.color is not None:
+            if action.hint_type == Action.COLOR:
                 assert any(card is not None and card.color == action.color for card in target.hand)
-            elif action.number is not None:
+            else:
                 assert any(card is not None and card.number == action.number for card in target.hand)
                 
         
@@ -179,9 +179,9 @@ class Game:
         elif action.type == Action.HINT:
             print action.type,
             print "to player %d," % action.player_id,
-            print "cards", action.hinted_card_pos,
+            print "cards", action.cards_pos,
             print "are",
-            print action.number if action.number is not None else action.color
+            print action.value
         
         print
     

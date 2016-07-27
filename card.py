@@ -68,7 +68,7 @@ class Card:
         # does this card (in this position) match the given hint?
         assert action.type == Action.HINT
         matches = self.matches(action.color, action.number)
-        return card_pos in action.hinted_card_pos and matches or card_pos not in action.hinted_card_pos and not matches
+        return card_pos in action.cards_pos and matches or card_pos not in action.cards_pos and not matches
     
     
     def playable(self, board):

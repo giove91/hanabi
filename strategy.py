@@ -4,7 +4,7 @@
 import itertools
 import copy
 
-from action import Action
+from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
 
 
@@ -140,7 +140,7 @@ class HintsManager:
                 return None
         
         
-        involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos] + [self.strategy.hands[action.player_id][card_pos] for card_pos in action.hinted_card_pos]
+        involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos] + [self.strategy.hands[action.player_id][card_pos] for card_pos in action.cards_pos]
         
         involved_cards = list(set(involved_cards))
         my_card_pos = cards_pos[self.id]
@@ -174,7 +174,7 @@ class HintsManager:
             # In the first round, hints on 1s are natural.
             
             # Update knowledge.
-            for card_pos in action.hinted_card_pos:
+            for card_pos in action.cards_pos:
                 kn = self.knowledge[action.player_id][card_pos]
                 kn.number = True
                 kn.one = True
@@ -191,7 +191,7 @@ class HintsManager:
             else:
                 kn.color = True
         
-        for card_pos in action.hinted_card_pos:
+        for card_pos in action.cards_pos:
             kn = self.knowledge[action.player_id][card_pos]
             if number_hint:
                 kn.number = True
@@ -284,7 +284,7 @@ class HintsManager:
         # TODO: migliorare rispetto alla scelta greedy
         if best_player_id is not None and best >= 3:
             self.log("give natural hints on 1s to player %d (%d cards)" % (best_player_id, best))
-            return Action(Action.HINT, player_id=best_player_id, color=None, number=1)
+            return HintAction(player_id=best_player_id, number=1)
         
         else:
             return None
@@ -345,8 +345,10 @@ class HintsManager:
                     # because other players obtain information from this.
                     # If the hint doesn't involve any useful card, avoid giving the hint.
                     if num_useful > 0:
-                        possibilities[number_hint] = (num_playable, num_relevant, len(involved_cards)), Action(Action.HINT, player_id=player_id, color=color, number=number)
-        
+                        possibilities[number_hint] = (
+                                (num_playable, num_relevant, len(involved_cards)),
+                                HintAction(player_id=player_id, color=color, number=number)
+                            )
         """
         if self.is_first_round():
             # Hints on 1s are natural in the first round.
@@ -728,21 +730,21 @@ class Strategy:
             card_pos = self.get_best_play_last_round()
             if card_pos is not None:
                 # play the card
-                return Action(Action.PLAY, card_pos=card_pos)
+                return PlayAction(card_pos=card_pos)
         
         else:
             # check for playable cards in my hand
             card_pos = self.get_best_play()
             if card_pos is not None:
                 # play the card
-                return Action(Action.PLAY, card_pos=card_pos)
+                return PlayAction(card_pos=card_pos)
         
         
             
         
         if self.hints == 0:
             # discard card
-            return Action(Action.DISCARD, card_pos=self.get_best_discard()[0])
+            return DiscardAction(card_pos=self.get_best_discard()[0])
         
         
         if self.hints <= 1 and self.deck_size >= 2:
@@ -753,19 +755,19 @@ class Strategy:
             
             if useful_weight < tolerance:
                 # discard is surely good
-                return Action(Action.DISCARD, card_pos=card_pos)
+                return DiscardAction(card_pos=card_pos)
             
             elif all(card.relevant(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
                 if relevant_weight < 0.5 + tolerance:
                     # close your eyes and discard
                     self.log("next player has only relevant cards, so I discard")
-                    return Action(Action.DISCARD, card_pos=card_pos)
+                    return DiscardAction(card_pos=card_pos)
             
             elif all(card.useful(self.board, self.full_deck, self.discard_pile) for card in self.hands[self.next_player_id()]):
                 if relevant_weight < tolerance and useful_weight < 1.0 + tolerance:
                     # discard anyway
                     self.log("next player has only useful cards, so I discard")
-                    return Action(Action.DISCARD, card_pos=card_pos)
+                    return DiscardAction(card_pos=card_pos)
         
         
         # try to give indirect hint
@@ -777,7 +779,7 @@ class Strategy:
             # failed to give indirect hint
             # discard card
             self.log("failed to give a hint")
-            return Action(Action.DISCARD, card_pos=self.get_best_discard()[0])
+            return DiscardAction(card_pos=self.get_best_discard()[0])
 
 
 
