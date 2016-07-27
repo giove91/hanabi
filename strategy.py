@@ -220,7 +220,7 @@ class HintsManager:
             return my_card_pos, color, number
         
         else:
-            # No hint (apparently I already know everything).
+            # no hint (apparently I already know everything)
             return None
     
     
