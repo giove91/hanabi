@@ -3,7 +3,9 @@
 
 
 class Action(object):
-    
+    """
+    Generic action.
+    """
     PLAY = 'Play'
     DISCARD = 'Discard'
     HINT = 'Hint'
@@ -72,9 +74,5 @@ class HintAction(Action):
         player = game.players[self.player_id]
         self.cards_pos = [i for (i, card) in enumerate(player.hand) if card is not None and (card.number == self.number or card.color == self.color)]
         assert len(self.cards_pos) > 0
-        
-        # FIXME deprecated! use self.hint_type instead!
-        self.number_hint = self.number is not None  # boolean variable to know if the hint is about numbers or colors
-
 
 

@@ -18,11 +18,12 @@ class Knowledge:
         return ("C" if self.color else "-") + ("N" if self.number else "-") + ("O" if self.one else "-")
     
     
-    def knows(self, number_hint=False):
-        if number_hint:
-            return self.number
-        else:
+    def knows(self, hint_type):
+        assert hint_type in Action.HINT_TYPES
+        if hint_type == Action.COLOR:
             return self.color
+        else:
+            return self.number
 
 
 class HintsManager:
@@ -80,23 +81,23 @@ class HintsManager:
         return False
     
     
-    def choose_card(self, player_id, target_id, turn, number_hint):
+    def choose_card(self, player_id, target_id, turn, hint_type):
         # choose which of the target's cards receive a hint from the current player in the given turn
-        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.number if number_hint else kn.color)]
+        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.color if hint_type == Action.COLOR else kn.number)]
         
         if len(possible_cards) == 0:
             # do not give hints
             return None
         
         # TODO: forse usare un vero hash
-        n = turn * 11**3 + (1 if number_hint else 0) * 119 + player_id * 11 + target_id
+        n = turn * 11**3 + (0 if hint_type == Action.COLOR else 1) * 119 + player_id * 11 + target_id
         
         return possible_cards[n % len(possible_cards)]
     
     
-    def choose_all_cards(self, player_id, turn, number_hint):
+    def choose_all_cards(self, player_id, turn, hint_type):
         # choose all cards that receive hints from the given player
-        return {target_id: self.choose_card(player_id, target_id, turn, number_hint) for target_id in xrange(self.num_players) if target_id != player_id and self.choose_card(player_id, target_id, turn, number_hint) is not None}
+        return {target_id: self.choose_card(player_id, target_id, turn, hint_type) for target_id in xrange(self.num_players) if target_id != player_id and self.choose_card(player_id, target_id, turn, hint_type) is not None}
     
     
     def infer_playable_cards(self, player_id, action):
@@ -108,9 +109,11 @@ class HintsManager:
         - the choice of the type of hint (color/number) is primarily based on the number of playable cards.
         Call this function before receive_hint(), i.e. before knowledge is updated.
         """
-        number_hint = action.number_hint
-        cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
-        alternative_cards_pos = self.choose_all_cards(player_id, action.turn, not number_hint)
+        hint_type = action.hint_type
+        opposite_hint_type = Action.NUMBER if hint_type == Action.COLOR else Action.COLOR
+        
+        cards_pos = self.choose_all_cards(player_id, action.turn, hint_type)
+        alternative_cards_pos = self.choose_all_cards(player_id, action.turn, opposite_hint_type)
         
         if self.id not in cards_pos or self.id not in alternative_cards_pos:
             # I already knew about one of the two cards
@@ -125,7 +128,7 @@ class HintsManager:
             # In the first round hints on 1s are natural, so it's better not to infer anything.
             return None
         """
-        if number_hint:
+        if hint_type == Action.NUMBER:
             # the alternative hint would have been on colors
             visible_colors = set(card.color for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
             if len(visible_colors) < Card.NUM_COLORS:
@@ -166,8 +169,8 @@ class HintsManager:
         """
         Decode hint given by someone else (not necessarily directly to me).
         """
-        number_hint = action.number_hint
-        cards_pos = self.choose_all_cards(player_id, action.turn, number_hint)
+        hint_type = action.hint_type
+        cards_pos = self.choose_all_cards(player_id, action.turn, hint_type)
         
         """
         if self.is_first_round() and action.number == 1:
@@ -183,36 +186,36 @@ class HintsManager:
             return None
         """
     
-        # Update knowledge.
+        # update knowledge
         for (target_id, card_pos) in cards_pos.iteritems():
             kn = self.knowledge[target_id][card_pos]
-            if number_hint:
-                kn.number = True
-            else:
+            if hint_type == Action.COLOR:
                 kn.color = True
+            else:
+                kn.number = True
         
         for card_pos in action.cards_pos:
             kn = self.knowledge[action.player_id][card_pos]
-            if number_hint:
-                kn.number = True
-            else:
+            if hint_type == Action.COLOR:
                 kn.color = True
+            else:
+                kn.number = True
         
-        # Decode my hint.
+        # decode my hint
         if self.id in cards_pos:
-            n = action.number if number_hint else self.COLORS_TO_NUMBERS[action.color]
+            n = action.number if hint_type == Action.NUMBER else self.COLORS_TO_NUMBERS[action.color]
             my_card_pos = cards_pos[self.id]
-            modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
+            modulo = Card.NUM_NUMBERS if hint_type == Action.NUMBER else Card.NUM_COLORS
             
             involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i != player_id and i in cards_pos]
             
-            m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(action.turn)
+            m = sum(card.number if hint_type == Action.NUMBER else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(action.turn)
             my_value = (n - m) % modulo
             
-            number = my_value if number_hint else None
+            number = my_value if hint_type == Action.NUMBER else None
             if number == 0:
                 number = 5
-            color = Card.COLORS[my_value] if not number_hint else None
+            color = Card.COLORS[my_value] if hint_type == Action.COLOR else None
             
             return my_card_pos, color, number
         
@@ -222,26 +225,26 @@ class HintsManager:
     
     
     
-    def compute_hint_value(self, turn, number_hint):
+    def compute_hint_value(self, turn, hint_type):
         """
         Returns the color/number we need to give a hint about.
         """
-        cards_pos = self.choose_all_cards(self.id, turn, number_hint)
+        cards_pos = self.choose_all_cards(self.id, turn, hint_type)
         
         if len(cards_pos) == 0:
             # the other players already know everything
             return None
         
         # compute sum of visible cards in the given positions
-        modulo = Card.NUM_NUMBERS if number_hint else Card.NUM_COLORS
+        modulo = Card.NUM_NUMBERS if hint_type == Action.NUMBER else Card.NUM_COLORS
         involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i in cards_pos]
-        m = sum(card.number if number_hint else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(turn)
+        m = sum(card.number if hint_type == Action.NUMBER else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(turn)
         m %= modulo
         
-        number = m if number_hint else None
+        number = m if hint_type == Action.NUMBER else None
         if number == 0:
             number = 5
-        color = Card.COLORS[m] if not number_hint else None
+        color = Card.COLORS[m] if hint_type == Action.COLOR else None
         
         return color, number
     
@@ -301,15 +304,15 @@ class HintsManager:
             if hint_action is not None:
                 return hint_action
         """
-        # Try the two possible number_hint values.
-        possibilities = {False: None, True: None}   # possibilities for number_hint, with results
+        # try the two possible hint_type values
+        possibilities = {hint_type: None for hint_type in Action.HINT_TYPES}
         
-        for number_hint in [False, True]:
+        for hint_type in Action.HINT_TYPES:
             # compute which cards would be involved in this indirect hint
-            cards_pos = self.choose_all_cards(self.id, self.strategy.turn, number_hint)
+            cards_pos = self.choose_all_cards(self.id, self.strategy.turn, hint_type)
             involved_cards = [self.strategy.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
             
-            res = self.compute_hint_value(self.strategy.turn, number_hint)
+            res = self.compute_hint_value(self.strategy.turn, hint_type)
             if res is not None:
                 color, number = res
             
@@ -330,7 +333,7 @@ class HintsManager:
                 
                 if player_id is not None:
                     # found player to give the hint to
-                    involved_cards += [card for (card_pos, card) in enumerate(self.strategy.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.knowledge[player_id][card_pos].knows(number_hint)]
+                    involved_cards += [card for (card_pos, card) in enumerate(self.strategy.hands[player_id]) if card is not None and card.matches(color=color, number=number) and not self.knowledge[player_id][card_pos].knows(hint_type)]
                     involved_cards = list(set(involved_cards))
                     
                     num_relevant = sum(1 for card in involved_cards if card.relevant(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile) and not self.is_duplicate(card))
@@ -345,7 +348,7 @@ class HintsManager:
                     # because other players obtain information from this.
                     # If the hint doesn't involve any useful card, avoid giving the hint.
                     if num_useful > 0:
-                        possibilities[number_hint] = (
+                        possibilities[hint_type] = (
                                 (num_playable, num_relevant, len(involved_cards)),
                                 HintAction(player_id=player_id, color=color, number=number)
                             )
@@ -539,7 +542,7 @@ class Strategy:
             
             if res is not None:
                 card_pos, color, number = res
-                # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.number_hint else "color %s" % color))
+                # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.hint_type == Action.NUMBER else "color %s" % color))
             
                 p = self.possibilities[card_pos]
                 for card in self.full_deck:
