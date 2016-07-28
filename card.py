@@ -65,7 +65,7 @@ class Card:
         return color == self.color or number == self.number
     
     def matches_hint(self, action, card_pos):
-        # does this card (in this position) match the given hint?
+        # does this card (in the given position) match the given hint?
         assert action.type == Action.HINT
         matches = self.matches(action.color, action.number)
         return card_pos in action.cards_pos and matches or card_pos not in action.cards_pos and not matches

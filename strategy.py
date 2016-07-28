@@ -756,6 +756,9 @@ class Strategy:
             card_pos, relevant_weight, useful_weight = self.get_best_discard()
             tolerance = 1e-3
             
+            # TODO: se il giocatore successivo ha almeno una carta giocabile di cui è a conoscenza,
+            # controllare quello dopo ancora (e così via)
+            
             if useful_weight < tolerance:
                 # discard is surely good
                 return DiscardAction(card_pos=card_pos)
