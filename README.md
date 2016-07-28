@@ -16,6 +16,7 @@ Run a new game
 
 **Command line options**
 * `-n NUM_PLAYERS` change the number of players (default is 5)
+* `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
 * `-c` run the game without pausing (otherwise, by default, each new turn is played by pressing ENTER)
 * `-s` activate the strategy log
 * `-l FILENAME` load the initial deck from the given file (otherwise, by default, the initial deck is shuffled randomly)
