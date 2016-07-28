@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys
 import itertools
 import copy
+
+sys.path.append("..") 
+
 
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck

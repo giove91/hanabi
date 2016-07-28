@@ -6,6 +6,7 @@ from game import Game
 
 if __name__ == "__main__":
     # default values
+    ai = "alphahanabi"
     wait_key = True
     num_players = 5
     log = True
@@ -16,6 +17,12 @@ if __name__ == "__main__":
     repeat = None  # repeat until a bad result is reached
     
     # read options
+    if '-a' in sys.argv[1:]:
+        # select AI to be used
+        i = sys.argv.index('-a')
+        assert len(sys.argv) >= i+2
+        ai = sys.argv[i+1]
+    
     if '-c' in sys.argv[1:]:
         wait_key = False
     
@@ -53,6 +60,7 @@ if __name__ == "__main__":
         print
         game = Game(
                 num_players=num_players,
+                ai=ai,
                 wait_key=wait_key,
                 log=log,
                 strategy_log=strategy_log,

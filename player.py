@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys
 
 from card import Card
 from action import Action
-from strategy import Strategy
 
 
 class Player:
-    def __init__(self, id, game, hand, strategy_log=False):
+    def __init__(self, id, game, hand, ai, strategy_log=False):
         # my id (order of play)
         self.id = id
         
@@ -18,7 +18,12 @@ class Player:
         # initial hand of cards
         self.hand = hand
         
-        # strategy object
+        # AI to be used
+        self.ai = ai
+        
+        # create strategy object
+        sys.path.append(self.ai)
+        from strategy import Strategy
         self.strategy = Strategy(verbose=strategy_log)
     
     

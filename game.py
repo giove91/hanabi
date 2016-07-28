@@ -22,8 +22,9 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, wait_key=True, log=True, strategy_log=False, dump_deck_to=None, load_deck_from=None):
+    def __init__(self, num_players, ai="alphahanabi", wait_key=True, log=True, strategy_log=False, dump_deck_to=None, load_deck_from=None):
         self.num_players = num_players
+        self.ai = ai
         
         self.wait_key = wait_key    # press Enter to advance turn
         self.log = log              # log advancement of the game to standard output
@@ -57,6 +58,7 @@ class Game:
                 id = i,
                 game = self,
                 hand = [self.draw_card_from_deck() for i in xrange(self.k)],
+                ai = self.ai,
                 strategy_log = self.strategy_log
             ) for i in xrange(self.num_players)]
         
