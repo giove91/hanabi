@@ -10,6 +10,7 @@ sys.path.append("..")
 
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
+from base_strategy import BaseStrategy
 
 
 class Knowledge:
@@ -378,7 +379,7 @@ class HintsManager:
 
 
 
-class Strategy:
+class Strategy(BaseStrategy):
     """
     An instance of this class represents a player's strategy.
     It only has the knowledge of that player, and it must make decisions.
@@ -409,16 +410,6 @@ class Strategy:
         
         # indirect hints manager
         self.hints_manager = HintsManager(num_players, k, id, self)
-    
-    
-    def update(self, hints, lives, my_hand, turn, last_turn, deck_size):
-        # to be called every turn
-        self.hints = hints
-        self.lives = lives
-        self.my_hand = my_hand
-        self.turn = turn
-        self.last_turn = last_turn
-        self.deck_size = deck_size
     
     
     def visible_cards(self):
@@ -790,14 +781,5 @@ class Strategy:
             # discard card
             self.log("failed to give a hint")
             return DiscardAction(card_pos=self.get_best_discard()[0])
-
-
-
-    
-    def log(self, message):
-        if self.verbose:
-            print "Player %d: %s" % (self.id, message)
-
-
 
 
