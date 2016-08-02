@@ -1,9 +1,9 @@
 Hanabi
 =====================
 
-This program serves both as a server for the [Hanabi card game](https://boardgamegeek.com/boardgame/98778/hanabi) and for an AI that plays for each of the players.
+This program serves both as a server for the [Hanabi card game](https://boardgamegeek.com/boardgame/98778/hanabi) and as an AI that plays for each of the players.
 
-The AI is all contained in the file `strategy.py`. It currently plays well only the 5-player games.
+The main AI is contained in the directory `alphahanabi`. It currently plays well only the 5-player games.
 
 Requirements
 ---------------------
