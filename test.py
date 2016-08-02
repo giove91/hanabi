@@ -8,12 +8,23 @@ from game import Game
 
 
 if __name__ == "__main__":
+    # default values
+    ai = "alphahanabi"
     num_players = 5
     num_simulations = 1000
     
-    if len(sys.argv) > 1:
-        # read number of players from command line
-        num_players = int(sys.argv[1])
+    
+    if '-a' in sys.argv[1:]:
+        # select AI to be used
+        i = sys.argv.index('-a')
+        assert len(sys.argv) >= i+2
+        ai = sys.argv[i+1]
+    
+    if '-n' in sys.argv[1:]:
+        # read number of players
+        i = sys.argv.index('-n')
+        assert len(sys.argv) >= i+2
+        num_players = int(sys.argv[i+1])
     
     
     results = []
@@ -23,9 +34,12 @@ if __name__ == "__main__":
         print >> sys.stderr, i,
         game = Game(
                 num_players=num_players,
+                ai=ai,
                 wait_key=False,
                 log=False,
-                strategy_log=False
+                strategy_log=False,
+                dump_deck_to=None,
+                load_deck_from=None,
             )
         
         game.setup()
