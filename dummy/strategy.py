@@ -36,16 +36,19 @@ class Strategy(BaseStrategy):
                 color = None
                 number = card.number
             
+            self.log("give some random hint")
             return HintAction(player_id, color=color, number=number)
         
         elif random.randint(0,1) == 0:
             # play random card
             card_pos = random.choice([c_pos for (c_pos, value) in enumerate(self.my_hand) if value is not None])
+            self.log("play some random card")
             return PlayAction(card_pos)
         
         else:
             # discard random card
             card_pos = random.choice([c_pos for (c_pos, value) in enumerate(self.my_hand) if value is not None])
+            self.log("discard some random card")
             return DiscardAction(card_pos)
 
 
