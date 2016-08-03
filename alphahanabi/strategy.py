@@ -159,8 +159,8 @@ class HintsManager:
         alternative_num_playable = sum(1 for card in alternative_involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
         
         # self.log("Num playable: %d, %d" % (num_playable, alternative_num_playable))
-        # self.log(involved_cards.__repr__() + " " + my_card_pos.__repr__())
-        # self.log(alternative_involved_cards.__repr__() + " " + alternative_my_card_pos.__repr__())
+        # self.log("%r %r" % (involved_cards, my_card_pos))
+        # self.log("%r %r" % (alternative_involved_cards, alternative_my_card_pos))
         
         if alternative_num_playable > num_playable:
             assert alternative_num_playable == num_playable + 1
@@ -274,7 +274,7 @@ class HintsManager:
                         # this player knows about a 1
                         virtually_played.add(self.strategy.hands[player_id][card_pos].color)
         
-        self.log("virtually played ones are " + virtually_played.__repr__())
+        self.log("virtually played ones are %r" % virtually_played)
         
         # analyze hands of other players
         new_colors = {}
@@ -345,8 +345,8 @@ class HintsManager:
                     num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
                     num_useful = sum(1 for card in involved_cards if card.useful(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile) and not self.is_duplicate(card))
                     
-                    # self.log("involved cards: " + involved_cards.__repr__())
-                    # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
+                    self.log("involved cards: %r" % involved_cards)
+                    self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
                     
                     # Give priority to playable cards, then to relevant cards, then to the number of cards.
                     # WARNING: it is important that the first parameter is the number of playable cards,
@@ -453,14 +453,14 @@ class Strategy(BaseStrategy):
             # check if this hand is possible
             if all(card is None or card in self.possibilities[card_pos] for (card_pos, card) in enumerate(hand)):
                 # this hand is possible
-                # self.log("possible hand " + hand.__repr__())
+                # self.log("possible hand %r" % hand)
                 
                 for (card_pos, card) in enumerate(hand):
                     if card is not None:
                         new_possibilities[card_pos].add(card)
         
-        self.log("old possibilities " + [len(p) for p in self.possibilities].__repr__())
-        self.log("new possibilities " + [len(p) for p in new_possibilities].__repr__())
+        self.log("old possibilities %r" % [len(p) for p in self.possibilities])
+        self.log("new possibilities %r" % [len(p) for p in new_possibilities])
         
         # update possibilities
         self.possibilities = new_possibilities
@@ -493,7 +493,7 @@ class Strategy(BaseStrategy):
                 for (i, p) in enumerate(self.possibilities):
                     for card in self.full_deck:
                         if not card.matches_hint(action, i) and card in p:
-                            # self.log("removing card " + card.__repr__() + " from position %d due to hint" % i)
+                            # self.log("removing card %r from position %d due to hint" % (card, i))
                             p.remove(card)
             
             else:
@@ -515,7 +515,7 @@ class Strategy(BaseStrategy):
                         for (i, p) in enumerate(self.possibilities):
                             for card in self.full_deck:
                                 if not card.matches_hint(action, -1) and card in p:
-                                    # self.log("removing card " + card.__repr__() + " from position %d due to hint skip" % i)
+                                    # self.log("removing card %r from position %d due to hint skip" % (card, i))
                                     p.remove(card)
             
             # infer playability of some cards, from the type of the given hint
@@ -526,10 +526,10 @@ class Strategy(BaseStrategy):
                 playable, non_playable = res
                 for card in self.full_deck:
                     if card.playable(self.board) and card in self.possibilities[non_playable] and not self.hints_manager.is_duplicate(card):
-                        # self.log("removing " + card.__repr__() + " from position %d" % non_playable)
+                        # self.log("removing %r from position %d" % (card, non_playable))
                         self.possibilities[non_playable].remove(card)
                     elif not card.playable(self.board) and card in self.possibilities[playable] and not self.hints_manager.is_duplicate(card):
-                        # self.log("removing " + card.__repr__() + " from position %d" % playable)
+                        # self.log("removing %r from position %d" % (card, playable))
                         self.possibilities[playable].remove(card)
             
             # process indirect hint
