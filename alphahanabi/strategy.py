@@ -345,8 +345,8 @@ class HintsManager:
                     num_playable = sum(1 for card in involved_cards if card.playable(self.strategy.board) and not self.is_duplicate(card))
                     num_useful = sum(1 for card in involved_cards if card.useful(self.strategy.board, self.strategy.full_deck, self.strategy.discard_pile) and not self.is_duplicate(card))
                     
-                    self.log("involved cards: %r" % involved_cards)
-                    self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
+                    # self.log("involved cards: %r" % involved_cards)
+                    # self.log("there are %d playable, %d relevant, %d useful cards" % (num_playable, num_relevant, num_useful))
                     
                     # Give priority to playable cards, then to relevant cards, then to the number of cards.
                     # WARNING: it is important that the first parameter is the number of playable cards,
