@@ -99,9 +99,8 @@ class ValueHintsManager(BaseHintsManager):
     def is_appropriate(self, player_id, action):
         """
         Returns True iff the given hint should be processed by this HintsManager.
-        At the moment, all the hints are given by the ValueHintsManager.
         """
-        return True
+        return not (self.num_players == 5 and self.k == 4 and action.turn == 0)
     
     
     def shift(self, turn):
@@ -427,29 +426,45 @@ class PlayabilityHintsManager(BaseHintsManager):
         
         Example 2: 4 White, 4 White, 4 Yellow, 3 Yellow.
             4 White -> White (color)
-            4 White -> None
-            4 Yellow -> 4 (number)
+            4 White -> 4 (number)
+            4 Yellow -> Yellow (color)
             3 Yellow -> 3 (number)
         
         Ideally, each card should be associated to a different value (if this is not possible,
         then some card cannot be selected and is associated to the hint type None).
         All the player must agree on the association.
-        Moreover, it is better when the chosen value is unique in the hand (in this way, the owner
+        Ideally it would be better when the chosen value is unique in the hand (in this way, the owner
         can infer the card even without knowing the association). If the value is not unique, the owner
-        will not be able to decode the hint.
+        will not be able to decode the hint. [Not implemented yet]
         Notice that the above example do not need to match the behaviour of this method.
         """
         
         assert player_id != self.id
         
         # create bipartite graph
-        B = nx.Graph()
-        B.add_nodes_from(xrange(self.k), bipartite=0)
-        # TODO continue
-        B.add_nodes_from(
+        G = nx.Graph()
+        G.add_nodes_from(xrange(self.k), bipartite = 0)
+        G.add_nodes_from(
                 [(Action.COLOR, color) for color in Card.COLORS],
-                bipartite=1
+                bipartite = 1
             )
+        G.add_nodes_from(
+                [(Action.NUMBER, number) for number in xrange(1, Card.NUM_NUMBERS + 1)],
+                bipartite = 1
+            )
+        
+        for (card_pos, card) in enumerate(self.hands[player_id]):
+            G.add_edge(card_pos, (Action.COLOR, card.color))
+            G.add_edge(card_pos, (Action.NUMBER, card.number))
+        
+        left, right = nx.bipartite.sets(G)
+        
+        # compute matching (hoping that it is deterministic)
+        matching = nx.bipartite.maximum_matching(G)
+        # TODO: prefer unique values (see documentation above)
+        
+        return [matching[card_pos] for card_pos in xrange(self.k)]
+        
     
     
     def receive_hint(self, player_id, action):

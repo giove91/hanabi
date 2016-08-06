@@ -190,11 +190,14 @@ class Strategy(BaseStrategy):
         
         elif action.type == Action.HINT:
             # someone gave a hint!
-            # use the right hints manager to process it
+            # exactly one hints manager should process it
+            num_managers = 0
             for hints_manager in self.hints_managers:
                 if hints_manager.is_appropriate(player_id, action):
                     # the given hint is appropriate for this hints manager
                     hints_manager.receive_hint(player_id, action)
+                    num_managers += 1
+            assert num_managers == 1
         
         # update possibilities with visible cards
         self.update_possibilities()
