@@ -11,7 +11,32 @@ sys.path.append("..")
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
 from base_strategy import BaseStrategy
-from hints_manager import HintsManager
+from hints_manager import ValueHintsManager
+
+
+
+
+class Knowledge:
+    """
+    An instance of this class represents what a player knows about a card, as known by everyone.
+    """
+    
+    def __init__(self, color=False, number=False, one=False):
+        self.color = color
+        self.number = number
+        self.one = one  # knowledge about this card being a (likely) playable one
+    
+    def __repr__(self):
+        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("O" if self.one else "-")
+    
+    
+    def knows(self, hint_type):
+        assert hint_type in Action.HINT_TYPES
+        if hint_type == Action.COLOR:
+            return self.color
+        else:
+            return self.number
+
 
 
 
@@ -44,8 +69,11 @@ class Strategy(BaseStrategy):
         # remove cards of other players from possibilities
         self.update_possibilities()
         
-        # indirect hints manager
-        self.hints_manager = HintsManager(num_players, k, id, self)
+        # knowledge of all players
+        self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
+        
+        # hints manager(s)
+        self.value_hints_manager = ValueHintsManager(self)
     
     
     def visible_cards(self):
@@ -98,8 +126,9 @@ class Strategy(BaseStrategy):
         self.log("old possibilities %r" % [len(p) for p in self.possibilities])
         self.log("new possibilities %r" % [len(p) for p in new_possibilities])
         
-        # update possibilities
-        self.possibilities = new_possibilities
+        # update possibilities (avoid direct assignment to mantain references)
+        for (card_pos, p) in enumerate(self.possibilities):
+            p &= new_possibilities[card_pos]
     
     
     def next_player_id(self):
@@ -109,11 +138,27 @@ class Strategy(BaseStrategy):
         return [i for i in xrange(self.num_players) if i != self.id]
     
     
+    def reset_knowledge(self, player_id, card_pos, new_card_exists):
+        self.knowledge[player_id][card_pos] = Knowledge(False, False) if new_card_exists else Knowledge(True, True)
+        # TODO: forse è meglio mettere False, False per le carte che non esistono
+    
+    
+    def print_knowledge(self):
+        print "Knowledge"
+        for i in xrange(self.num_players):
+            print "Player %d:" % i,
+            for card_pos in xrange(self.k):
+                print self.knowledge[i][card_pos],
+            print
+        print
+
+    
     def feed_turn(self, player_id, action):
+        assert self.possibilities is self.value_hints_manager.possibilities
         if action.type in [Action.PLAY, Action.DISCARD]:
             # reset knowledge of the player
             new_card = self.my_hand[action.card_pos] if player_id == self.id else self.hands[player_id][action.card_pos]
-            self.hints_manager.reset_knowledge(player_id, action.card_pos, new_card is not None)
+            self.reset_knowledge(player_id, action.card_pos, new_card is not None)
             
             if player_id == self.id:
                 # check for my new card
@@ -121,71 +166,15 @@ class Strategy(BaseStrategy):
         
         elif action.type == Action.HINT:
             # someone gave a hint!
-            
-            if action.player_id == self.id:
-                # they gave me a hint!
-                
-                # process direct hint
-                for (i, p) in enumerate(self.possibilities):
-                    for card in self.full_deck:
-                        if not card.matches_hint(action, i) and card in p:
-                            # self.log("removing card %r from position %d due to hint" % (card, i))
-                            p.remove(card)
-            
-            else:
-                """
-                elif not self.hints_manager.is_first_round() and action.number != 1:
-                """
-            
-                # maybe I wasn't given a hint because I didn't have the right cards
-                # recall: the hint is given to the first suitable person after the one who gives the hint
-                
-                for i in range(player_id + 1, self.num_players) + range(player_id):
-                    if i == action.player_id:
-                        # reached hinted player
-                        break
-                    
-                    elif i == self.id:
-                        # I was reached first!
-                        # I am between the hinter and the hinted player!
-                        for (i, p) in enumerate(self.possibilities):
-                            for card in self.full_deck:
-                                if not card.matches_hint(action, -1) and card in p:
-                                    # self.log("removing card %r from position %d due to hint skip" % (card, i))
-                                    p.remove(card)
-            
-            # infer playability of some cards, from the type of the given hint
-            res = self.hints_manager.infer_playable_cards(player_id, action)
-            
-            if res is not None:
-                # found a playable and a non-playable card
-                playable, non_playable = res
-                for card in self.full_deck:
-                    if card.playable(self.board) and card in self.possibilities[non_playable] and not self.hints_manager.is_duplicate(card):
-                        # self.log("removing %r from position %d" % (card, non_playable))
-                        self.possibilities[non_playable].remove(card)
-                    elif not card.playable(self.board) and card in self.possibilities[playable] and not self.hints_manager.is_duplicate(card):
-                        # self.log("removing %r from position %d" % (card, playable))
-                        self.possibilities[playable].remove(card)
-            
-            # process indirect hint
-            res = self.hints_manager.receive_hint(player_id, action)
-            
-            if res is not None:
-                card_pos, color, number = res
-                # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.hint_type == Action.NUMBER else "color %s" % color))
-            
-                p = self.possibilities[card_pos]
-                for card in self.full_deck:
-                    if not card.matches(color=color, number=number) and card in p:
-                        p.remove(card)
+            # use the right hints manager to process it
+            self.value_hints_manager.receive_hint(player_id, action)
         
         # update possibilities with visible cards
         self.update_possibilities()
         
         # print knowledge
         if self.verbose and self.id == self.num_players-1:
-            self.hints_manager.print_knowledge()
+            self.print_knowledge()
 
     
     
@@ -243,7 +232,7 @@ class Strategy(BaseStrategy):
         """
         """
         # If I know a 1 is playable, I play it.
-        for (card_pos, kn) in enumerate(self.hints_manager.knowledge[self.id]):
+        for (card_pos, kn) in enumerate(self.knowledge[self.id]):
             if kn.one:
                 self.log("playing 1 in position %d" % card_pos)
                 return card_pos
@@ -264,7 +253,7 @@ class Strategy(BaseStrategy):
                 
                 # self.log("checking if card in position %d does not overlap..." % card_pos)
                 good = True
-                for (player_id, knowledge) in enumerate(self.hints_manager.knowledge):
+                for (player_id, knowledge) in enumerate(self.knowledge):
                     if player_id != self.id:
                         for (c_pos, kn) in enumerate(knowledge):
                             # self.log("[position %d] checking player %d, card in position %d, kn.one %r, card %r, card in p %r" % (card_pos, player_id, c_pos, kn.one, self.hands[player_id][c_pos], self.hands[player_id][c_pos] in p))
@@ -407,8 +396,8 @@ class Strategy(BaseStrategy):
                     return DiscardAction(card_pos=card_pos)
         
         
-        # try to give indirect hint
-        hint_action = self.hints_manager.get_best_hint()
+        # try to give hint, using the right hints manager
+        hint_action = self.value_hints_manager.get_best_hint()
         
         if hint_action is not None:
             return hint_action

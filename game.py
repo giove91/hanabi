@@ -135,7 +135,7 @@ class Game:
                     self.increment_hints()
             else:
                 # play is not successful
-                end_game = end_game or self.decrement_lives()
+                end_game = self.decrement_lives() or end_game
             
             # remove card from hand
             self.discard_pile.append(card)

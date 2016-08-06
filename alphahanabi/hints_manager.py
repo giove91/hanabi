@@ -12,33 +12,21 @@ from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card
 
 
-
-class Knowledge:
-    def __init__(self, color=False, number=False, one=False):
-        self.color = color
-        self.number = number
-        self.one = one  # knowledge about this card being a (likely) playable one
-    
-    def __repr__(self):
-        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("O" if self.one else "-")
-    
-    
-    def knows(self, hint_type):
-        assert hint_type in Action.HINT_TYPES
-        if hint_type == Action.COLOR:
-            return self.color
-        else:
-            return self.number
-
-
-
-class HintsManager:
-    def __init__(self, num_players, k, id, strategy):
-        self.num_players = num_players
-        self.k = k
-        self.id = id    # my player id
+class BaseHintsManager(object):
+    """
+    Base class for a HintsManager.
+    """
+    def __init__(self, strategy):
         self.strategy = strategy    # my strategy object
-        self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
+        
+        # copy something from the strategy
+        self.num_players = strategy.num_players
+        self.k = strategy.k
+        self.id = strategy.id
+        self.possibilities = strategy.possibilities
+        self.full_deck = strategy.full_deck
+        self.board = strategy.board
+        self.knowledge = strategy.knowledge
         
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
     
@@ -46,25 +34,47 @@ class HintsManager:
     def log(self, message):
         self.strategy.log(message)
     
+    
+    def receive_hint(self, player_id, action):
+        # receive hint given by player_id
+        if action.player_id == self.id:
+            # process direct hint
+            for (i, p) in enumerate(self.possibilities):
+                for card in self.full_deck:
+                    if not card.matches_hint(action, i) and card in p:
+                        # self.log("removing card %r from position %d due to hint" % (card, i))
+                        p.remove(card)
+        
+        # update knowledge
+        for card_pos in action.cards_pos:
+            kn = self.knowledge[action.player_id][card_pos]
+            if action.hint_type == Action.COLOR:
+                kn.color = True
+            else:
+                kn.number = True
+        
+        assert self.possibilities is self.strategy.possibilities
+        assert self.board is self.strategy.board
+        assert self.knowledge is self.strategy.knowledge
+    
+
+
+class ValueHintsManager(BaseHintsManager):
+    """
+    Value hints manager.
+    A hint communicates to each other player the value (color or number) of one of his cards.
+    """
+    def __init__(self, *args, **kwargs):
+        super(ValueHintsManager, self).__init__(*args, **kwargs)
+        self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
+    
+    
     def is_first_round(self):
         return self.strategy.turn < self.num_players
 
-
-    def reset_knowledge(self, player_id, card_pos, new_card_exists):
-        self.knowledge[player_id][card_pos] = Knowledge(False, False) if new_card_exists else Knowledge(True, True)
-    
-    def print_knowledge(self):
-        print "Knowledge"
-        for i in xrange(self.num_players):
-            print "Player %d:" % i,
-            for card_pos in xrange(self.k):
-                print self.knowledge[i][card_pos],
-            print
-        print
-
     
     def shift(self, turn):
-        # a "random" shift in the hint
+        # a variable shift in the hint
         return turn + turn / self.num_players
     
     
@@ -113,7 +123,7 @@ class HintsManager:
         Here it is important that:
         - playability of a card depends only on things that everyone sees;
         - the choice of the type of hint (color/number) is primarily based on the number of playable cards.
-        Call this function before receive_hint(), i.e. before knowledge is updated.
+        Call this function before decode_hint(), i.e. before knowledge is updated.
         """
         hint_type = action.hint_type
         opposite_hint_type = Action.NUMBER if hint_type == Action.COLOR else Action.COLOR
@@ -171,37 +181,17 @@ class HintsManager:
         
         
 
-    def receive_hint(self, player_id, action):
+    def decode_hint(self, player_id, action):
         """
         Decode hint given by someone else (not necessarily directly to me).
         """
         hint_type = action.hint_type
         cards_pos = self.choose_all_cards(player_id, action.turn, hint_type)
+        # self.log("%r" % cards_pos)
         
-        """
-        if self.is_first_round() and action.number == 1:
-            # In the first round, hints on 1s are natural.
-            
-            # Update knowledge.
-            for card_pos in action.cards_pos:
-                kn = self.knowledge[action.player_id][card_pos]
-                kn.number = True
-                kn.one = True
-                kn.color = True # he doesn't know the color, but he will play the one anyway
-            
-            return None
-        """
-    
         # update knowledge
         for (target_id, card_pos) in cards_pos.iteritems():
             kn = self.knowledge[target_id][card_pos]
-            if hint_type == Action.COLOR:
-                kn.color = True
-            else:
-                kn.number = True
-        
-        for card_pos in action.cards_pos:
-            kn = self.knowledge[action.player_id][card_pos]
             if hint_type == Action.COLOR:
                 kn.color = True
             else:
@@ -218,6 +208,9 @@ class HintsManager:
             m = sum(card.number if hint_type == Action.NUMBER else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(action.turn)
             my_value = (n - m) % modulo
             
+            # self.log("involved_cards: %r" % involved_cards)
+            # self.log("m: %d, my value: %d, shift: %d" % (m, my_value,self.shift(action.turn)))
+            
             number = my_value if hint_type == Action.NUMBER else None
             if number == 0:
                 number = 5
@@ -231,11 +224,59 @@ class HintsManager:
     
     
     
+    def receive_hint(self, player_id, action):
+        # maybe I wasn't given a hint because I didn't have the right cards
+        # recall: the hint is given to the first suitable person after the one who gives the hint
+        for i in range(player_id + 1, self.num_players) + range(player_id):
+            if i == action.player_id:
+                # reached hinted player
+                break
+            
+            elif i == self.id:
+                # I was reached first!
+                # I am between the hinter and the hinted player!
+                for (i, p) in enumerate(self.possibilities):
+                    for card in self.full_deck:
+                        if not card.matches_hint(action, -1) and card in p:
+                            # self.log("removing card %r from position %d due to hint skip" % (card, i))
+                            p.remove(card)
+        
+        # infer playability of some cards, from the type of the given hint
+        res = self.infer_playable_cards(player_id, action)
+        
+        if res is not None:
+            # found a playable and a non-playable card
+            playable, non_playable = res
+            for card in self.full_deck:
+                if card.playable(self.board) and card in self.possibilities[non_playable] and not self.is_duplicate(card):
+                    # self.log("removing %r from position %d" % (card, non_playable))
+                    self.possibilities[non_playable].remove(card)
+                elif not card.playable(self.board) and card in self.possibilities[playable] and not self.is_duplicate(card):
+                    # self.log("removing %r from position %d" % (card, playable))
+                    self.possibilities[playable].remove(card)
+        
+        # process value hint
+        res = self.decode_hint(player_id, action)
+        
+        if res is not None:
+            card_pos, color, number = res
+            # self.log("thanks to indirect hint, understood that card %d has " % card_pos + ("number %d" % number if action.hint_type == Action.NUMBER else "color %s" % color))
+        
+            p = self.possibilities[card_pos]
+            for card in self.full_deck:
+                if not card.matches(color=color, number=number) and card in p:
+                    p.remove(card)
+        
+        # important: this is done at the end because it changes the knowledge
+        super(ValueHintsManager, self).receive_hint(player_id, action)
+    
+    
     def compute_hint_value(self, turn, hint_type):
         """
         Returns the color/number we need to give a hint about.
         """
         cards_pos = self.choose_all_cards(self.id, turn, hint_type)
+        # self.log("cards_pos: %r" % cards_pos)
         
         if len(cards_pos) == 0:
             # the other players already know everything
@@ -244,6 +285,7 @@ class HintsManager:
         # compute sum of visible cards in the given positions
         modulo = Card.NUM_NUMBERS if hint_type == Action.NUMBER else Card.NUM_COLORS
         involved_cards = [hand[cards_pos[i]] for (i, hand) in self.strategy.hands.iteritems() if i in cards_pos]
+        assert all(card is not None for card in involved_cards)
         m = sum(card.number if hint_type == Action.NUMBER else self.COLORS_TO_NUMBERS[card.color] for card in involved_cards) + self.shift(turn)
         m %= modulo
         
@@ -319,6 +361,9 @@ class HintsManager:
             involved_cards = [self.strategy.hands[i][card_pos] for (i, card_pos) in cards_pos.iteritems()]
             
             res = self.compute_hint_value(self.strategy.turn, hint_type)
+            
+            # self.log("involved cards: %r" % involved_cards)
+            # self.log("%r, shift: %d" % (res, self.shift(self.strategy.turn)))
             if res is not None:
                 color, number = res
             
