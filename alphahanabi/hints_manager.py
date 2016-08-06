@@ -47,7 +47,7 @@ class BaseHintsManager(object):
     
     def receive_hint(self, player_id, action):
         """
-        Receive hint given by player_id.
+        Receive hint given by player_id and update knowledge.
         """
         if action.player_id == self.id:
             # process direct hint
@@ -256,6 +256,9 @@ class ValueHintsManager(BaseHintsManager):
     
     
     def receive_hint(self, player_id, action):
+        """
+        Receive hint given by player_id and update knowledge.
+        """
         # maybe I wasn't given a hint because I didn't have the right cards
         # recall: the hint is given to the first suitable person after the one who gives the hint
         for i in range(player_id + 1, self.num_players) + range(player_id):
@@ -415,20 +418,20 @@ class PlayabilityHintsManager(BaseHintsManager):
     
     def card_to_hint_type(self, player_id):
         """
-        For the given player (different from me) associate to each card the hint type to give
-        in order to recognise that card.
+        For the given player (different from me) return a matching between each card  and the hint type
+        to give in order to recognise that card.
         
         Example 1: 4 White, 4 Yellow, 3 Yellow, 2 Red.
-            4 White -> White (color)
-            4 Yellow -> 4 (number)
-            3 Yellow -> 3 (number)
-            2 Red -> Red (color)
+            4 White <-> White (color)
+            4 Yellow <-> 4 (number)
+            3 Yellow <-> 3 (number)
+            2 Red <-> Red (color)
         
         Example 2: 4 White, 4 White, 4 Yellow, 3 Yellow.
-            4 White -> White (color)
-            4 White -> 4 (number)
-            4 Yellow -> Yellow (color)
-            3 Yellow -> 3 (number)
+            4 White <-> White (color)
+            4 White <-> 4 (number)
+            4 Yellow <-> Yellow (color)
+            3 Yellow <-> 3 (number)
         
         Ideally, each card should be associated to a different value (if this is not possible,
         then some card cannot be selected and is associated to the hint type None).
@@ -463,13 +466,13 @@ class PlayabilityHintsManager(BaseHintsManager):
         matching = nx.bipartite.maximum_matching(G)
         # TODO: prefer unique values (see documentation above)
         
-        return [matching[card_pos] for card_pos in xrange(self.k)]
+        return matching
         
     
     
     def receive_hint(self, player_id, action):
         """
-        Receive hint given by player_id.
+        Receive hint given by player_id and update knowledge.
         """
         
         super(PlayabilityHintsManager, self).receive_hint(player_id, action)
@@ -485,10 +488,36 @@ class PlayabilityHintsManager(BaseHintsManager):
         # give this kind of hint only in 5-player games with 4 cards per player
         assert self.num_players == 5 and self.k == 4
         
-        # TODO: continue
-        print self.card_to_hint_type(1)
+        # find which cards are playable, and compute sum
+        m = 0
+        for (player_id, hand) in self.hands.iteritems():
+            string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
+            m += int(string, 2)
+        m %= 2 ** self.k
         
-
+        # find player and card to give a hint about
+        other_players = sorted(self.hands.keys())
+        player_id = other_players[m / self.k]
+        card_pos = m % self.k
+        
+        # find hint type
+        matching = self.card_to_hint_type(player_id)
+        
+        # return hint
+        if card_pos in matching:
+            hint_type = matching[card_pos][0]
+            color = None
+            number = None
+            if hint_type == Action.COLOR:
+                color = matching[card_pos][1]
+            else:
+                number = matching[card_pos][1]
+            
+            return HintAction(player_id=player_id, color=color, number=number)
+        
+        else:
+            # the card is not matched with any hint type (unlikely, but possible)
+            return None
 
 
 
