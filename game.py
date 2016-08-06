@@ -228,7 +228,8 @@ class Game:
         """
         Load the initial deck from file.
         """
-        print "Loading initial deck from %s" % filename
+        if self.log:
+            print "Loading initial deck from %s" % filename
         file = open(filename, "r")
         
         self.deck = []
