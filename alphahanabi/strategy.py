@@ -21,13 +21,12 @@ class Knowledge:
     An instance of this class represents what a player knows about a card, as known by everyone.
     """
     
-    def __init__(self, color=False, number=False, one=False):
+    def __init__(self, color=False, number=False):
         self.color = color
         self.number = number
-        self.one = one  # knowledge about this card being a (likely) playable one
     
     def __repr__(self):
-        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("O" if self.one else "-")
+        return ("C" if self.color else "-") + ("N" if self.number else "-")
     
     
     def knows(self, hint_type):
@@ -46,6 +45,11 @@ class Strategy(BaseStrategy):
     It only has the knowledge of that player, and it must make decisions.
     """
     
+    DECK_SIZE_BEFORE_FULL_SEARCH = {
+        4: 10,
+        5: 4,
+    }   # k (number of cards per hand): size of the deck when we want to consider all combinations of cards
+    
     def __init__(self, verbose=False):
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
         self.verbose = verbose
@@ -63,7 +67,7 @@ class Strategy(BaseStrategy):
         # store a copy of the full deck
         self.full_deck = deck()
         
-        # for each of my card, I store its possibilities
+        # for each of my card, store its possibilities
         self.possibilities = [set(self.full_deck) for i in xrange(self.k)]
         
         # remove cards of other players from possibilities
@@ -84,6 +88,7 @@ class Strategy(BaseStrategy):
             for card in hand:
                 yield card
     
+    
     def update_possibilities(self):
         # update possibilities removing visible cards
         for card in self.visible_cards():
@@ -91,6 +96,7 @@ class Strategy(BaseStrategy):
                 if card in p:
                     p.remove(card)
         assert all(len(p) > 0 or self.my_hand[card_pos] is None for (card_pos, p) in enumerate(self.possibilities))
+    
     
     def update_possibilities_with_combinations(self):
         # update possibilities examining all combinations of my hand
@@ -230,15 +236,9 @@ class Strategy(BaseStrategy):
         """
         Choose the best card to play.
         """
-        """
-        # If I know a 1 is playable, I play it.
-        for (card_pos, kn) in enumerate(self.knowledge[self.id]):
-            if kn.one:
-                self.log("playing 1 in position %d" % card_pos)
-                return card_pos
-        """
-        # I prefer playing cards that allow a higher number of playable cards.
-        # In case of tie, I prefer (in this order): NUM_NUMBERS, 1, 2, 3, ..., NUM_NUMBERS-1 (and I give weights accordingly).
+        # prefer playing cards that allow a higher number of playable cards;
+        # in case of tie, prefer (in this order):
+        # NUM_NUMBERS, 1, 2, 3, ..., NUM_NUMBERS-1 (weights are given accordingly)
         
         WEIGHT = {number: Card.NUM_NUMBERS - number for number in xrange(1, Card.NUM_NUMBERS)}
         WEIGHT[Card.NUM_NUMBERS] = Card.NUM_NUMBERS
@@ -249,24 +249,7 @@ class Strategy(BaseStrategy):
         best_avg_weight = 0.0           # average weight (in the sense above)
         for (card_pos, p) in enumerate(self.possibilities):
             if all(card.playable(self.board) for card in p) and len(p) > 0:
-                # check that the cards do not overlap with playable 1s of other players
-                
-                # self.log("checking if card in position %d does not overlap..." % card_pos)
-                good = True
-                for (player_id, knowledge) in enumerate(self.knowledge):
-                    if player_id != self.id:
-                        for (c_pos, kn) in enumerate(knowledge):
-                            # self.log("[position %d] checking player %d, card in position %d, kn.one %r, card %r, card in p %r" % (card_pos, player_id, c_pos, kn.one, self.hands[player_id][c_pos], self.hands[player_id][c_pos] in p))
-                            if kn.one and any(card.equals(self.hands[player_id][c_pos]) for card in p):
-                                good = False
-                
-                if not good:
-                    # some of my possible cards overlap with a playable one of someone else
-                    self.log("some of my possible cards overlap with a playable 1 of someone else")
-                    continue
-                
                 # the card in this position is surely playable!
-                
                 # how many cards of the other players become playable, on average?
                 num_playable = []
                 for card in p:
@@ -345,7 +328,7 @@ class Strategy(BaseStrategy):
     
     def get_turn_action(self):
         # update possibilities checking all combinations
-        if self.deck_size < 10:
+        if self.deck_size < self.DECK_SIZE_BEFORE_FULL_SEARCH[self.k]:
             self.update_possibilities_with_combinations()
         
         # if this is the last round, play accordingly
@@ -397,7 +380,7 @@ class Strategy(BaseStrategy):
         
         
         # try to give hint, using the right hints manager
-        hint_action = self.value_hints_manager.get_best_hint()
+        hint_action = self.value_hints_manager.get_hint()
         
         if hint_action is not None:
             return hint_action

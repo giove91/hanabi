@@ -18,7 +18,7 @@ class Action(object):
     
     
     def __init__(self, type, card_pos=None, player_id=None, color=None, number=None):
-        raise Exception("Called init method of generic action")
+        raise NotImplementedError
     
     def apply(self, game):
         # populate other fields, using information from the game

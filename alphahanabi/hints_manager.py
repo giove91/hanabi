@@ -57,21 +57,23 @@ class BaseHintsManager(object):
         assert self.board is self.strategy.board
         assert self.knowledge is self.strategy.knowledge
     
+    
+    def get_hint(self):
+        # compute hint to give
+        raise NotImplementedError
+
+
 
 
 class ValueHintsManager(BaseHintsManager):
     """
     Value hints manager.
-    A hint communicates to each other player the value (color or number) of one of his cards.
+    A hint communicates to every other player the value (color or number) of one of his cards.
     """
     def __init__(self, *args, **kwargs):
         super(ValueHintsManager, self).__init__(*args, **kwargs)
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
     
-    
-    def is_first_round(self):
-        return self.strategy.turn < self.num_players
-
     
     def shift(self, turn):
         # a variable shift in the hint
@@ -79,8 +81,9 @@ class ValueHintsManager(BaseHintsManager):
     
     
     def is_duplicate(self, card):
-        # says if the given card is owned by some player who knows everything about it
-        
+        """
+        Says if the given card is owned by some player who knows everything about it.
+        """
         # check other players
         for (player_id, hand) in self.strategy.hands.iteritems():
             for card_pos in xrange(self.k):
@@ -98,7 +101,9 @@ class ValueHintsManager(BaseHintsManager):
     
     
     def choose_card(self, player_id, target_id, turn, hint_type):
-        # choose which of the target's cards receive a hint from the current player in the given turn
+        """
+        Choose which of the target's cards receive a hint from the current player in the given turn.
+        """
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.color if hint_type == Action.COLOR else kn.number)]
         
         if len(possible_cards) == 0:
@@ -112,7 +117,9 @@ class ValueHintsManager(BaseHintsManager):
     
     
     def choose_all_cards(self, player_id, turn, hint_type):
-        # choose all cards that receive hints from the given player
+        """
+        Choose all cards that receive hints (of the given type) from the given player in the given turn.
+        """
         return {target_id: self.choose_card(player_id, target_id, turn, hint_type) for target_id in xrange(self.num_players) if target_id != player_id and self.choose_card(player_id, target_id, turn, hint_type) is not None}
     
     
@@ -139,11 +146,6 @@ class ValueHintsManager(BaseHintsManager):
             # the hint was given to me, so I haven't enough information to infer something
             return None
         
-        """
-        if self.is_first_round():
-            # In the first round hints on 1s are natural, so it's better not to infer anything.
-            return None
-        """
         if hint_type == Action.NUMBER:
             # the alternative hint would have been on colors
             visible_colors = set(card.color for (i, hand) in self.strategy.hands.iteritems() for card in hand if i != player_id and card is not None)   # numbers visible by me and by the hinter
@@ -297,60 +299,9 @@ class ValueHintsManager(BaseHintsManager):
         return color, number
     
     
-    def get_best_hint_on_ones(self):
-        """
-        Returns the best natural hint on playable ones.
-        """
-        assert all(not kn.one for kn in self.knowledge[self.id])    # If I knew some 1, I should have played it.
-        
-        virtually_played = set()
-        
-        for color in Card.COLORS:
-            if self.strategy.board[color] >= 1:
-                # a 1 of that color was already played
-                virtually_played.add(color)
-        
-        for (player_id, knowledge) in enumerate(self.knowledge):
-            if player_id != self.id:
-                for (card_pos, kn) in enumerate(knowledge):
-                    if kn.one:
-                        # this player knows about a 1
-                        virtually_played.add(self.strategy.hands[player_id][card_pos].color)
-        
-        self.log("virtually played ones are %r" % virtually_played)
-        
-        # analyze hands of other players
-        new_colors = {}
-        best = 0
-        best_player_id = None
-        for (player_id, hand) in self.strategy.hands.iteritems():
-            owned = [card.color for (card_pos, card) in enumerate(hand) if card.number == 1 and not self.knowledge[player_id][card_pos].one]
-            
-            if len(owned) == len(set(owned)) and all(color not in virtually_played for color in owned):
-                # this player is suitable for my hint!
-                new_colors[player_id] = owned
-                if len(owned) > best:
-                    best, best_player_id = len(owned), player_id
-        
-        # TODO: migliorare rispetto alla scelta greedy
-        if best_player_id is not None and best >= 3:
-            self.log("give natural hints on 1s to player %d (%d cards)" % (best_player_id, best))
-            return HintAction(player_id=best_player_id, number=1)
-        
-        else:
-            return None
-
-    
-    def get_best_hint(self):
+    def get_hint(self):
         """
         Choose the best hint to give, if any.
-        """
-        """
-        if self.is_first_round():
-            # Try to give a natural hint on 1s.
-            hint_action = self.get_best_hint_on_ones()
-            if hint_action is not None:
-                return hint_action
         """
         # try the two possible hint_type values
         possibilities = {hint_type: None for hint_type in Action.HINT_TYPES}
@@ -403,12 +354,6 @@ class ValueHintsManager(BaseHintsManager):
                                 (num_playable, num_relevant, len(involved_cards)),
                                 HintAction(player_id=player_id, color=color, number=number)
                             )
-        """
-        if self.is_first_round():
-            # Hints on 1s are natural in the first round.
-            if possibilities[True] is not None and possibilities[True][1].number == 1:
-                possibilities[True] = None
-        """
         
         # choose between color and number
         possibilities = {a: b for (a,b) in possibilities.iteritems() if b is not None}
