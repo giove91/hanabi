@@ -11,7 +11,7 @@ sys.path.append("..")
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
 from base_strategy import BaseStrategy
-from hints_manager import ValueHintsManager
+from hints_manager import ValueHintsManager, PlayabilityHintsManager
 
 
 
@@ -81,6 +81,12 @@ class Strategy(BaseStrategy):
         
         # hints manager(s)
         self.value_hints_manager = ValueHintsManager(self)
+        self.playability_hints_manager = PlayabilityHintsManager(self)
+        
+        self.hints_managers = [
+                self.value_hints_manager,
+                self.playability_hints_manager,
+            ]
     
     
     def visible_cards(self):
@@ -185,7 +191,10 @@ class Strategy(BaseStrategy):
         elif action.type == Action.HINT:
             # someone gave a hint!
             # use the right hints manager to process it
-            self.value_hints_manager.receive_hint(player_id, action)
+            for hints_manager in self.hints_managers:
+                if hints_manager.is_appropriate(player_id, action):
+                    # the given hint is appropriate for this hints manager
+                    hints_manager.receive_hint(player_id, action)
         
         # update possibilities with visible cards
         self.update_possibilities()

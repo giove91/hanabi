@@ -37,6 +37,13 @@ class BaseHintsManager(object):
         self.strategy.log(message)
     
     
+    def is_appropriate(self, player_id, action):
+        """
+        Returns True iff the given hint should be processed by this HintsManager.
+        """
+        raise NotImplementedError
+    
+    
     def receive_hint(self, player_id, action):
         """
         Receive hint given by player_id.
@@ -67,6 +74,7 @@ class BaseHintsManager(object):
         Compute hint to give.
         """
         raise NotImplementedError
+    
 
 
 
@@ -85,6 +93,14 @@ class ValueHintsManager(BaseHintsManager):
     def __init__(self, *args, **kwargs):
         super(ValueHintsManager, self).__init__(*args, **kwargs)
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
+    
+    
+    def is_appropriate(self, player_id, action):
+        """
+        Returns True iff the given hint should be processed by this HintsManager.
+        At the moment, all the hints are given by the ValueHintsManager.
+        """
+        return True
     
     
     def shift(self, turn):
@@ -379,5 +395,38 @@ class ValueHintsManager(BaseHintsManager):
         
         else:
             return None
+
+
+
+
+class PlayabilityHintsManager(BaseHintsManager):
+    """
+    Playability hints manager.
+    A hint communicates to every other player which of their cards are playable.
+    """
+    
+    def is_appropriate(self, player_id, action):
+        """
+        Returns True iff the given hint should be processed by this HintsManager.
+        """
+        return False
+    
+    
+    def receive_hint(self, player_id, action):
+        """
+        Receive hint given by player_id.
+        """
+        
+        super(PlayabilityHintsManager, self).receive_hint(player_id, action)
+    
+    
+    def get_hint(self):
+        """
+        Compute hint to give.
+        """
+        raise NotImplementedError
+
+
+
 
 
