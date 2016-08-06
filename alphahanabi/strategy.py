@@ -404,7 +404,11 @@ class Strategy(BaseStrategy):
         
         
         # try to give hint, using the right hints manager
-        hint_action = self.value_hints_manager.get_hint()
+        if self.turn == 0 and self.num_players == 5:
+            hint_action = self.playability_hints_manager.get_hint()
+        else:
+            hint_action = self.value_hints_manager.get_hint()
+        
         
         if hint_action is not None:
             return hint_action

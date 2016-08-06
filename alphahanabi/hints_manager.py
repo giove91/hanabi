@@ -446,7 +446,10 @@ class PlayabilityHintsManager(BaseHintsManager):
         B = nx.Graph()
         B.add_nodes_from(xrange(self.k), bipartite=0)
         # TODO continue
-        # B.add_nodes_from(
+        B.add_nodes_from(
+                [(Action.COLOR, color) for color in Card.COLORS],
+                bipartite=1
+            )
     
     
     def receive_hint(self, player_id, action):
@@ -467,6 +470,8 @@ class PlayabilityHintsManager(BaseHintsManager):
         # give this kind of hint only in 5-player games with 4 cards per player
         assert self.num_players == 5 and self.k == 4
         
+        # TODO: continue
+        print self.card_to_hint_type(1)
         
 
 

@@ -19,7 +19,6 @@ class Card:
     NUM_NUMBERS = 5
     
     COLORS = [RED, BLUE, WHITE, YELLOW, GREEN, RAINBOW]
-    NUMBERS = [1, 2, 3, 4, 5]
     
     PRINTABLE_COLORS = {
             RED: 'red',
@@ -33,7 +32,6 @@ class Card:
     
     def __init__(self, id, color, number):
         assert color in self.COLORS
-        assert number in self.NUMBERS
         assert 1 <= number <= self.NUM_NUMBERS
         
         self.id = id
