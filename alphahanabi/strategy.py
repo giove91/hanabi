@@ -56,7 +56,9 @@ class Strategy(BaseStrategy):
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
-        # to be called once before the beginning
+        """
+        To be called once before the beginning.
+        """
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
@@ -82,6 +84,9 @@ class Strategy(BaseStrategy):
     
     
     def visible_cards(self):
+        """
+        Generators of all the cards visible by me.
+        """
         for card in self.discard_pile:
             yield card
         
@@ -91,7 +96,9 @@ class Strategy(BaseStrategy):
     
     
     def update_possibilities(self):
-        # update possibilities removing visible cards
+        """
+        Update possibilities removing visible cards.
+        """
         for card in self.visible_cards():
             for p in self.possibilities:
                 if card in p:
@@ -100,8 +107,10 @@ class Strategy(BaseStrategy):
     
     
     def update_possibilities_with_combinations(self):
-        # update possibilities examining all combinations of my hand
-        # better to do it with only few cards remaining!
+        """
+        Update possibilities examining all combinations of my hand.
+        Better to do it with only few cards remaining!
+        """
         possible_cards = set()
         for p in self.possibilities:
             possible_cards |= p
@@ -160,6 +169,9 @@ class Strategy(BaseStrategy):
 
     
     def feed_turn(self, player_id, action):
+        """
+        Receive information about a played turn.
+        """
         assert self.possibilities is self.value_hints_manager.possibilities
         if action.type in [Action.PLAY, Action.DISCARD]:
             # reset knowledge of the player
@@ -327,6 +339,9 @@ class Strategy(BaseStrategy):
 
     
     def get_turn_action(self):
+        """
+        Choose action for this turn.
+        """
         # update possibilities checking all combinations
         if self.deck_size < self.DECK_SIZE_BEFORE_FULL_SEARCH[self.k]:
             self.update_possibilities_with_combinations()

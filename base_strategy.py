@@ -12,7 +12,9 @@ class BaseStrategy(object):
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
-        # to be called once before the beginning
+        """
+        To be called once before the beginning.
+        """
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
@@ -23,7 +25,9 @@ class BaseStrategy(object):
     
     
     def update(self, hints, lives, my_hand, turn, last_turn, deck_size):
-        # to be called every turn
+        """
+        To be called immediately after every turn.
+        """
         self.hints = hints
         self.lives = lives
         self.turn = turn
@@ -36,11 +40,17 @@ class BaseStrategy(object):
     
     
     def feed_turn(self, player_id, action):
-        raise Exception("Non-overloaded method 'feed_turn'.")
+        """
+        Receive information about a played turn.
+        """
+        raise NotImplementedError
     
     
     def get_turn_action(self):
-        raise Exception("Non-overloaded method 'get_turn_action'.")
+        """
+        Choose action for this turn.
+        """
+        raise NotImplementedError
 
 
     def log(self, message):

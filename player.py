@@ -78,7 +78,7 @@ class Player:
         # update strategy
         self.update_strategy()
         
-        # get informed about what happened during a turn
+        # pass information about what happened during the turn
         self.strategy.feed_turn(turn.player.id, turn.action)
 
 

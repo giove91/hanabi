@@ -38,7 +38,9 @@ class BaseHintsManager(object):
     
     
     def receive_hint(self, player_id, action):
-        # receive hint given by player_id
+        """
+        Receive hint given by player_id.
+        """
         if action.player_id == self.id:
             # process direct hint
             for (i, p) in enumerate(self.possibilities):
@@ -61,7 +63,9 @@ class BaseHintsManager(object):
     
     
     def get_hint(self):
-        # compute hint to give
+        """
+        Compute hint to give.
+        """
         raise NotImplementedError
 
 
@@ -71,7 +75,13 @@ class ValueHintsManager(BaseHintsManager):
     """
     Value hints manager.
     A hint communicates to every other player the value (color or number) of one of his cards.
+    
+    More specifically, the players agree on a function player->card_pos (which depends on the turn and on other things).
+    The current player computes the sum of the values (color or number) of the agreed cards,
+    and gives a hint on that value.
+    Then each of the other players deduces the value of his card.
     """
+    
     def __init__(self, *args, **kwargs):
         super(ValueHintsManager, self).__init__(*args, **kwargs)
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
