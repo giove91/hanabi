@@ -20,9 +20,11 @@ class BaseHintsManager(object):
         self.strategy = strategy    # my strategy object
         
         # copy something from the strategy
+        self.id = strategy.id
         self.num_players = strategy.num_players
         self.k = strategy.k
-        self.id = strategy.id
+        self.my_hand = strategy.my_hand
+        self.hands = strategy.hands
         self.possibilities = strategy.possibilities
         self.full_deck = strategy.full_deck
         self.board = strategy.board
@@ -104,7 +106,8 @@ class ValueHintsManager(BaseHintsManager):
         """
         Choose which of the target's cards receive a hint from the current player in the given turn.
         """
-        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if not (kn.color if hint_type == Action.COLOR else kn.number)]
+        hand = new_card = self.my_hand if target_id == self.id else self.hands[target_id]
+        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if hand[card_pos] is not None and not (kn.color if hint_type == Action.COLOR else kn.number)]
         
         if len(possible_cards) == 0:
             # do not give hints

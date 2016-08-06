@@ -16,6 +16,7 @@ class BaseStrategy(object):
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
+        self.my_hand = [None] * k   # says in which positions there is actually a card
         self.hands = hands  # hands of other players
         self.board = board
         self.discard_pile = discard_pile
@@ -25,10 +26,13 @@ class BaseStrategy(object):
         # to be called every turn
         self.hints = hints
         self.lives = lives
-        self.my_hand = my_hand
         self.turn = turn
         self.last_turn = last_turn
         self.deck_size = deck_size
+        
+        # copy my_hand maintaining the reference
+        for card_pos in xrange(self.k):
+            self.my_hand[card_pos] = my_hand[card_pos]
     
     
     def feed_turn(self, player_id, action):

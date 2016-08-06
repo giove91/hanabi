@@ -60,6 +60,7 @@ class Strategy(BaseStrategy):
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
+        self.my_hand = [None] * k   # says in which positions there is actually a card
         self.hands = hands  # hands of other players
         self.board = board
         self.discard_pile = discard_pile
@@ -145,8 +146,7 @@ class Strategy(BaseStrategy):
     
     
     def reset_knowledge(self, player_id, card_pos, new_card_exists):
-        self.knowledge[player_id][card_pos] = Knowledge(False, False) if new_card_exists else Knowledge(True, True)
-        # TODO: forse è meglio mettere False, False per le carte che non esistono
+        self.knowledge[player_id][card_pos] = Knowledge(False, False)
     
     
     def print_knowledge(self):
