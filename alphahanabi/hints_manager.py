@@ -588,15 +588,8 @@ class PlayabilityHintsManager(BaseHintsManager):
         
         # return hint
         if card_pos in matching:
-            hint_type = matching[card_pos][0]
-            color = None
-            number = None
-            if hint_type == Action.COLOR:
-                color = matching[card_pos][1]
-            else:
-                number = matching[card_pos][1]
-            
-            return HintAction(player_id=player_id, color=color, number=number)
+            hint_type, value = matching[card_pos]
+            return HintAction(player_id=player_id, hint_type=hint_type, value=value)
         
         else:
             # the card is not matched with any hint type (unlikely, but possible)
