@@ -474,6 +474,87 @@ class PlayabilityHintsManager(BaseHintsManager):
         """
         Receive hint given by player_id and update knowledge.
         """
+        # receive this kind of hint only in 5-player games with 4 cards per player
+        assert self.num_players == 5 and self.k == 4
+        
+        if player_id != self.id:
+            # I am not the hinter
+            # find which cards are playable (excluding the hinter), and compute sum
+            m = 0
+            for (p_id, hand) in self.hands.iteritems():
+                if p_id != player_id:
+                    string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
+                    m += int(string, 2)
+            
+            # try to understand which card was the real target of the hint
+            if len(action.cards_pos) == 1:
+                [card_pos] = action.cards_pos
+            elif action.player_id != self.id:
+                # use the known matching
+                matching = self.card_to_hint_type(action.player_id)
+                card_pos = matching[(action.hint_type, action.value)]
+            else:
+                # unfortunately I cannot understand the card position
+                card_pos = None
+            
+            if card_pos is not None:
+                # find list of other players, as seen by the hinter
+                other_players = [i for i in xrange(self.num_players) if i != player_id]
+                other_players_inv = {p_id: position for (position, p_id) in enumerate(other_players)}
+                
+                # compute the difference, find the string of my playable cards
+                passed_number = self.k * other_players_inv[action.player_id] + card_pos
+                v = (passed_number - m) % (2 ** self.k)
+                # self.log("passed number is %d, part to subtract is %d" % (passed_number, m))
+                string = str(bin(v))[2:].zfill(self.k)
+                assert len(string) == self.k
+                playable_list = [True if c == "1" else False for c in string]
+                self.log("received playable string %s" % string)
+                
+                # update possibilities
+                for (card_pos, playable) in enumerate(playable_list):
+                    for card in self.full_deck:
+                        p = self.possibilities[card_pos]
+                        if card in p and (playable and not card.playable(self.board) or not playable and card.playable(self.board)):
+                            # self.log("removing %r from position %d" % (card, card_pos))
+                            p.remove(card)
+                        
+                        # TODO: take into account duplicate cards! (should not be considered playable)
+                        
+                        """
+                        if card.playable(self.board) and card in self.possibilities[non_playable] and not self.is_duplicate(card):
+                            # self.log("removing %r from position %d" % (card, non_playable))
+                            self.possibilities[non_playable].remove(card)
+                        elif not card.playable(self.board) and card in self.possibilities[playable] and not self.is_duplicate(card):
+                            # self.log("removing %r from position %d" % (card, playable))
+                            self.possibilities[playable].remove(card)
+                        """
+                
+                # update my knowledge
+                for (card_pos, playable) in enumerate(playable_list):
+                    kn = self.knowledge[self.id][card_pos]
+                    if playable:
+                        kn.playable = True
+                    else:
+                        kn.non_playable = True
+        
+        # update knowledge of players different by me and the hinter
+        for (p_id, hand) in self.hands.iteritems():
+            if p_id == player_id:
+                # skip the hinter
+                continue
+            
+            if p_id == action.player_id and len(action.cards_pos) > 1:
+                # skip the hinted player, because he doesn't know the exact card position
+                continue
+            
+            for (card_pos, card) in enumerate(hand):
+                kn = self.knowledge[p_id][card_pos]
+                if card.playable(self.board):
+                    kn.playable = True
+                else:
+                    kn.non_playable = True
+        
         
         super(PlayabilityHintsManager, self).receive_hint(player_id, action)
     
@@ -492,8 +573,10 @@ class PlayabilityHintsManager(BaseHintsManager):
         m = 0
         for (player_id, hand) in self.hands.iteritems():
             string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
+            self.log("player %d has %s (%d)" % (player_id, string, int(string, 2)))
             m += int(string, 2)
         m %= 2 ** self.k
+        # self.log("passed number: %d" % m)
         
         # find player and card to give a hint about
         other_players = sorted(self.hands.keys())

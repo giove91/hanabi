@@ -54,15 +54,32 @@ class HintAction(Action):
     """
     Action of type HINT.
     """
-    def __init__(self, player_id, color=None, number=None):
+    def __init__(self, player_id, color=None, number=None, hint_type=None, value=None):
+        """
+        A HintAction can be constructed giving the color or the number, or giving the hint type and the value.
+        """
         self.type = self.HINT
         self.player_id = player_id
         
-        assert color is not None and number is None or color is None and number is not None
-        self.color = color
-        self.number = number
-        self.value = color if color is not None else number
-        self.hint_type = self.COLOR if color is not None else self.NUMBER
+        if color is not None or number is not None:
+            assert color is not None and number is None or color is None and number is not None
+            assert hint_type is None and value is None
+            self.color = color
+            self.number = number
+            self.value = color if color is not None else number
+            self.hint_type = self.COLOR if color is not None else self.NUMBER
+        else:
+            assert hint_type is not None and value is not None
+            assert hint_type in self.HINT_TYPES
+            self.hint_type = hint_type
+            self.value = value
+            if hint_type == Action.COLOR:
+                self.color = value
+                self.number = None
+            else:
+                self.color = None
+                self.number = value
+    
     
     def __repr__(self):
         return "Play card %d" % self.card_pos

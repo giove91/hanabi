@@ -21,12 +21,15 @@ class Knowledge:
     An instance of this class represents what a player knows about a card, as known by everyone.
     """
     
-    def __init__(self, color=False, number=False):
+    def __init__(self, color=False, number=False, playable=False, non_playable=False):
         self.color = color
         self.number = number
+        self.playable = playable
+        self.non_playable = non_playable
+        # TODO: most of the time, knowing "playable" is equivalent to knowing "number"
     
     def __repr__(self):
-        return ("C" if self.color else "-") + ("N" if self.number else "-")
+        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("P" if self.playable else "-") + ("Q" if self.non_playable else "-")
     
     
     def knows(self, hint_type):
