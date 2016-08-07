@@ -41,6 +41,16 @@ class Knowledge:
 
 
 
+class HintsScheduler:
+    """
+    Decides which HintsManager should be used each time.
+    """
+    def __init__(self, strategy):
+        self.strategy = strategy
+        # TODO
+
+
+
 
 class Strategy(BaseStrategy):
     """
