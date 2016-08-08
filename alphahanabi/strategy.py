@@ -63,11 +63,11 @@ class HintsScheduler:
         self.playability_hints_manager = PlayabilityHintsManager(strategy)
     
     
-    def select_hints_manager(self, current_player, turn):
+    def select_hints_manager(self, player_id, turn):
         """
         Select the suitable hints manager to be used this time.
         """
-        if self.num_players == 5 and self.k == 4 and self.strategy.turn == 0:
+        if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):
             return self.playability_hints_manager
         else:
             return self.value_hints_manager

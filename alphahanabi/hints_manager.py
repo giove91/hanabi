@@ -249,7 +249,7 @@ class SumBasedHintsManager(BaseHintsManager):
         Compute hint to give.
         """
         x = self.compute_hash_sum(self.id) % self.modulo(self.id)
-        self.log("communicate message %d" % x)
+        # self.log("communicate message %d" % x)
         
         relevant_cards = self.relevant_cards(self.id)
         player_id, card_pos = relevant_cards[x]
@@ -279,7 +279,7 @@ class SumBasedHintsManager(BaseHintsManager):
         relevant_cards = self.relevant_cards(hinter_id)
         x = relevant_cards[(player_id, card_pos)]
         
-        self.log("received message %d" % x)
+        # self.log("received message %d" % x)
         
         # compute difference with other hashes
         y = (x - self.compute_hash_sum(hinter_id)) % self.modulo(hinter_id)
@@ -291,7 +291,7 @@ class SumBasedHintsManager(BaseHintsManager):
         if self.id != player_id:
             # I am not the hinter
             x = self.hint_to_integer(player_id, action)
-            self.log("the hash of my hand is %d" % x)
+            # self.log("the hash of my hand is %d" % x)
             data = self.process_hash(x)
         else:
             data = None
