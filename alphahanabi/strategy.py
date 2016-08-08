@@ -47,8 +47,30 @@ class HintsScheduler:
     """
     def __init__(self, strategy):
         self.strategy = strategy
-        # TODO
-
+        
+        # copy something from the strategy
+        self.id = strategy.id
+        self.num_players = strategy.num_players
+        self.k = strategy.k
+        self.my_hand = strategy.my_hand
+        self.hands = strategy.hands
+        self.full_deck = strategy.full_deck
+        self.board = strategy.board
+        self.knowledge = strategy.knowledge
+        
+        # hints manager(s)
+        self.value_hints_manager = ValueHintsManager(strategy)
+        self.playability_hints_manager = PlayabilityHintsManager(strategy)
+    
+    
+    def select_hints_manager(self):
+        """
+        Select the suitable hints manager to be used this time.
+        """
+        if self.num_players == 5 and self.k == 4 and self.strategy.turn == 0:
+            return self.playability_hints_manager
+        else:
+            return self.value_hints_manager
 
 
 
@@ -92,14 +114,8 @@ class Strategy(BaseStrategy):
         # knowledge of all players
         self.knowledge = [[Knowledge(color=False, number=False) for j in xrange(k)] for i in xrange(num_players)]
         
-        # hints manager(s)
-        self.value_hints_manager = ValueHintsManager(self)
-        self.playability_hints_manager = PlayabilityHintsManager(self)
-        
-        self.hints_managers = [
-                self.value_hints_manager,
-                self.playability_hints_manager,
-            ]
+        # hints scheduler
+        self.hints_scheduler = HintsScheduler(self)
     
     
     def visible_cards(self):
@@ -191,7 +207,6 @@ class Strategy(BaseStrategy):
         """
         Receive information about a played turn.
         """
-        assert self.possibilities is self.value_hints_manager.possibilities
         if action.type in [Action.PLAY, Action.DISCARD]:
             # reset knowledge of the player
             new_card = self.my_hand[action.card_pos] if player_id == self.id else self.hands[player_id][action.card_pos]
@@ -203,14 +218,9 @@ class Strategy(BaseStrategy):
         
         elif action.type == Action.HINT:
             # someone gave a hint!
-            # exactly one hints manager should process it
-            num_managers = 0
-            for hints_manager in self.hints_managers:
-                if hints_manager.is_appropriate(player_id, action):
-                    # the given hint is appropriate for this hints manager
-                    hints_manager.receive_hint(player_id, action)
-                    num_managers += 1
-            assert num_managers == 1
+            # the suitable hints manager must process it
+            hints_manager = self.hints_scheduler.select_hints_manager()
+            hints_manager.receive_hint(player_id, action)
         
         # update possibilities with visible cards
         self.update_possibilities()
@@ -420,11 +430,8 @@ class Strategy(BaseStrategy):
         
         
         # try to give hint, using the right hints manager
-        if self.turn == 0 and self.num_players == 5:
-            hint_action = self.playability_hints_manager.get_hint()
-        else:
-            hint_action = self.value_hints_manager.get_hint()
-        
+        hints_manager = self.hints_scheduler.select_hints_manager()
+        hint_action = hints_manager.get_hint()
         
         if hint_action is not None:
             return hint_action
