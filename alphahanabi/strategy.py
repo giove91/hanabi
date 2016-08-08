@@ -11,7 +11,7 @@ sys.path.append("..")
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
 from base_strategy import BaseStrategy
-from hints_manager import ValueHintsManager, PlayabilityHintsManager, DummyHintsManager
+from hints_manager import ValueHintsManager, PlayabilityHintsManager
 
 
 
@@ -61,14 +61,12 @@ class HintsScheduler:
         # hints manager(s)
         self.value_hints_manager = ValueHintsManager(strategy)
         self.playability_hints_manager = PlayabilityHintsManager(strategy)
-        self.dummy_hints_manager = DummyHintsManager(strategy)
     
     
     def select_hints_manager(self):
         """
         Select the suitable hints manager to be used this time.
         """
-        # return self.dummy_hints_manager
         if self.num_players == 5 and self.k == 4 and self.strategy.turn == 0:
             return self.playability_hints_manager
         else:

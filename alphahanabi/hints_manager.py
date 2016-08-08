@@ -4,7 +4,6 @@
 import sys
 import itertools
 import copy
-import networkx as nx
 
 sys.path.append("..") 
 
@@ -94,26 +93,30 @@ class SumBasedHintsManager(BaseHintsManager):
     def process_hash(self, x):
         """
         Process the given hash of my hand, passed through a hint.
+        Optionally, return data to be used by update_knowledge.
         """
         # To be overloaded by child classes.
         raise NotImplementedError
     
     
-    def update_knowledge(self):
+    def update_knowledge(self, hinter_id, data=None):
         """
         Update knowledge after a hint has been given.
+        Optionally, get data from process_hash.
         """
         # To be overloaded by child classes.
         raise NotImplementedError
     
     
-    def compute_hash_sum(self, excluded=None):
+    def compute_hash_sum(self, hinter_id):
         """
-        Compute the sum of the hashes of the hands of the other players, possibly excluding one of them.
+        Compute the sum of the hashes of the hands of the other players, excluding the hinter and myself.
         """
         res = 0
         for (player_id, hand) in self.hands.iteritems():
-            if player_id != excluded:
+            if player_id != hinter_id:
+                h = self.hash(hand)
+                assert 0 <= h < self.modulo(hinter_id)
                 res += self.hash(hand)
         return res
     
@@ -222,7 +225,7 @@ class SumBasedHintsManager(BaseHintsManager):
         """
         Compute hint to give.
         """
-        x = self.compute_hash_sum() % self.modulo(self.id)
+        x = self.compute_hash_sum(self.id) % self.modulo(self.id)
         self.log("communicate message %d" % x)
         
         relevant_cards = self.relevant_cards(self.id)
@@ -256,7 +259,7 @@ class SumBasedHintsManager(BaseHintsManager):
         self.log("received message %d" % x)
         
         # compute difference with other hashes
-        y = x - self.compute_hash_sum(excluded=hinter_id) % self.modulo(hinter_id)
+        y = (x - self.compute_hash_sum(hinter_id)) % self.modulo(hinter_id)
         
         return y
     
@@ -266,36 +269,14 @@ class SumBasedHintsManager(BaseHintsManager):
             # I am not the hinter
             x = self.hint_to_integer(player_id, action)
             self.log("the hash of my hand is %d" % x)
-            self.process_hash(x)
+            data = self.process_hash(x)
+        else:
+            data = None
         
-        self.update_knowledge()
+        self.update_knowledge(player_id, data)
         
         super(SumBasedHintsManager, self).receive_hint(player_id, action)
         
-
-
-class DummyHintsManager(SumBasedHintsManager):
-    def hash(self, hand):
-        """
-        The hash of the hand that we want to communicate.
-        Must be an integer.
-        """
-        return sum(card.number for card in hand if card is not None) % 5
-    
-    
-    def process_hash(self, x):
-        """
-        Process the given hash of my hand, passed through a hint.
-        """
-        pass
-    
-    
-    def update_knowledge(self):
-        """
-        Update knowledge after a hint has been given.
-        """
-        pass
-    
 
 
 
@@ -614,142 +595,72 @@ class ValueHintsManager(BaseHintsManager):
 
 
 
-class PlayabilityHintsManager(BaseHintsManager):
+
+class PlayabilityHintsManager(SumBasedHintsManager):
     """
     Playability hints manager.
     A hint communicates to every other player which of their cards are playable.
     """
     
-    def card_to_hint_type(self, player_id):
+    def hash(self, hand):
         """
-        For the given player (different from me) return a matching between each card  and the hint type
-        to give in order to recognise that card.
-        
-        Example 1: 4 White, 4 Yellow, 3 Yellow, 2 Red.
-            4 White <-> White (color)
-            4 Yellow <-> 4 (number)
-            3 Yellow <-> 3 (number)
-            2 Red <-> Red (color)
-        
-        Example 2: 4 White, 4 White, 4 Yellow, 3 Yellow.
-            4 White <-> White (color)
-            4 White <-> 4 (number)
-            4 Yellow <-> Yellow (color)
-            3 Yellow <-> 3 (number)
-        
-        Ideally, each card should be associated to a different value (if this is not possible,
-        then some card cannot be selected and is associated to the hint type None).
-        All the player must agree on the association.
-        Ideally it would be better when the chosen value is unique in the hand (in this way, the owner
-        can infer the card even without knowing the association). If the value is not unique, the owner
-        will not be able to decode the hint. [Not implemented yet]
-        Notice that the above example do not need to match the behaviour of this method.
+        This hash encodes which cards are playable (as a binary integer).
         """
-        
-        assert player_id != self.id
-        
-        # create bipartite graph
-        G = nx.Graph()
-        G.add_nodes_from(xrange(self.k), bipartite = 0)
-        G.add_nodes_from(
-                [(Action.COLOR, color) for color in Card.COLORS],
-                bipartite = 1
-            )
-        G.add_nodes_from(
-                [(Action.NUMBER, number) for number in xrange(1, Card.NUM_NUMBERS + 1)],
-                bipartite = 1
-            )
-        
-        for (card_pos, card) in enumerate(self.hands[player_id]):
-            G.add_edge(card_pos, (Action.COLOR, card.color))
-            G.add_edge(card_pos, (Action.NUMBER, card.number))
-        
-        left, right = nx.bipartite.sets(G)
-        
-        # compute matching (hoping that it is deterministic)
-        matching = nx.bipartite.maximum_matching(G)
-        # TODO: prefer unique values (see documentation above)
-        
-        return matching
-        
+        string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
+        return int(string, 2)
     
     
-    def receive_hint(self, player_id, action):
+    def process_hash(self, x):
         """
-        Receive hint given by player_id and update knowledge.
+        Process the given hash of my hand, passed through a hint.
         """
-        # receive this kind of hint only in 5-player games with 4 cards per player
-        assert self.num_players == 5 and self.k == 4
+        assert 0 <= x < 2 ** self.k
+        string = str(bin(x))[2:].zfill(self.k)
+        assert len(string) == self.k
+        playable_list = [True if c == "1" else False for c in string]
+        self.log("received playable string %s" % string)
         
-        if player_id != self.id:
-            # I am not the hinter
-            # find which cards are playable (excluding the hinter), and compute sum
-            m = 0
-            for (p_id, hand) in self.hands.iteritems():
-                if p_id != player_id:
-                    string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
-                    m += int(string, 2)
-            
-            # try to understand which card was the real target of the hint
-            if len(action.cards_pos) == 1:
-                [card_pos] = action.cards_pos
-            elif action.player_id != self.id:
-                # use the known matching
-                matching = self.card_to_hint_type(action.player_id)
-                card_pos = matching[(action.hint_type, action.value)]
-            else:
-                # unfortunately I cannot understand the card position
-                card_pos = None
-            
-            if card_pos is not None:
-                # find list of other players, as seen by the hinter
-                other_players = [i for i in xrange(self.num_players) if i != player_id]
-                other_players_inv = {p_id: position for (position, p_id) in enumerate(other_players)}
+        # update possibilities
+        for (card_pos, playable) in enumerate(playable_list):
+            for card in self.full_deck:
+                p = self.possibilities[card_pos]
+                if card in p and (playable and not card.playable(self.board) or not playable and card.playable(self.board)):
+                    # self.log("removing %r from position %d" % (card, card_pos))
+                    p.remove(card)
                 
-                # compute the difference, find the string of my playable cards
-                passed_number = self.k * other_players_inv[action.player_id] + card_pos
-                v = (passed_number - m) % (2 ** self.k)
-                # self.log("passed number is %d, part to subtract is %d" % (passed_number, m))
-                string = str(bin(v))[2:].zfill(self.k)
-                assert len(string) == self.k
-                playable_list = [True if c == "1" else False for c in string]
-                self.log("received playable string %s" % string)
+                # TODO: take into account duplicate cards! (should not be considered playable)
                 
-                # update possibilities
-                for (card_pos, playable) in enumerate(playable_list):
-                    for card in self.full_deck:
-                        p = self.possibilities[card_pos]
-                        if card in p and (playable and not card.playable(self.board) or not playable and card.playable(self.board)):
-                            # self.log("removing %r from position %d" % (card, card_pos))
-                            p.remove(card)
-                        
-                        # TODO: take into account duplicate cards! (should not be considered playable)
-                        
-                        """
-                        if card.playable(self.board) and card in self.possibilities[non_playable] and not self.is_duplicate(card):
-                            # self.log("removing %r from position %d" % (card, non_playable))
-                            self.possibilities[non_playable].remove(card)
-                        elif not card.playable(self.board) and card in self.possibilities[playable] and not self.is_duplicate(card):
-                            # self.log("removing %r from position %d" % (card, playable))
-                            self.possibilities[playable].remove(card)
-                        """
-                
-                # update my knowledge
-                for (card_pos, playable) in enumerate(playable_list):
-                    kn = self.knowledge[self.id][card_pos]
-                    if playable:
-                        kn.playable = True
-                    else:
-                        kn.non_playable = True
+                """
+                if card.playable(self.board) and card in self.possibilities[non_playable] and not self.is_duplicate(card):
+                    # self.log("removing %r from position %d" % (card, non_playable))
+                    self.possibilities[non_playable].remove(card)
+                elif not card.playable(self.board) and card in self.possibilities[playable] and not self.is_duplicate(card):
+                    # self.log("removing %r from position %d" % (card, playable))
+                    self.possibilities[playable].remove(card)
+                """
+        
+        # return data for update_knowledge
+        return playable_list
+    
+    
+    def update_knowledge(self, hinter_id, data):
+        """
+        Update knowledge after a hint has been given.
+        """
+        if hinter_id != self.id:
+            # update my knowledge
+            playable_list = data
+            for (card_pos, playable) in enumerate(playable_list):
+                kn = self.knowledge[self.id][card_pos]
+                if playable:
+                    kn.playable = True
+                else:
+                    kn.non_playable = True
         
         # update knowledge of players different by me and the hinter
         for (p_id, hand) in self.hands.iteritems():
-            if p_id == player_id:
+            if p_id == hinter_id:
                 # skip the hinter
-                continue
-            
-            if p_id == action.player_id and len(action.cards_pos) > 1:
-                # skip the hinted player, because he doesn't know the exact card position
                 continue
             
             for (card_pos, card) in enumerate(hand):
@@ -758,47 +669,5 @@ class PlayabilityHintsManager(BaseHintsManager):
                     kn.playable = True
                 else:
                     kn.non_playable = True
-        
-        
-        super(PlayabilityHintsManager, self).receive_hint(player_id, action)
     
-    
-    def get_hint(self):
-        """
-        Compute hint to give.
-        """
-        if self.num_players != 5:
-            return None
-        
-        # give this kind of hint only in 5-player games with 4 cards per player
-        assert self.num_players == 5 and self.k == 4
-        
-        # find which cards are playable, and compute sum
-        m = 0
-        for (player_id, hand) in self.hands.iteritems():
-            string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
-            self.log("player %d has %s (%d)" % (player_id, string, int(string, 2)))
-            m += int(string, 2)
-        m %= 2 ** self.k
-        # self.log("passed number: %d" % m)
-        
-        # find player and card to give a hint about
-        other_players = sorted(self.hands.keys())
-        player_id = other_players[m / self.k]
-        card_pos = m % self.k
-        
-        # find hint type
-        matching = self.card_to_hint_type(player_id)
-        
-        # return hint
-        if card_pos in matching:
-            hint_type, value = matching[card_pos]
-            return HintAction(player_id=player_id, hint_type=hint_type, value=value)
-        
-        else:
-            # the card is not matched with any hint type (unlikely, but possible)
-            return None
-
-
-
 
