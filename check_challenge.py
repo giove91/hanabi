@@ -33,13 +33,13 @@ for (i, score) in SCORES.iteritems():
     game.setup()
     statistics = game.run_game()
     
-    print "Game %d" % i
-    print statistics
-    
     diff = statistics.score - score
     difference += diff
     
+    print "Game %d" % i
     print "Old score: %d (%d)" % (score, diff)
+    print statistics
+
 
 print
 print "Difference: %d" % difference

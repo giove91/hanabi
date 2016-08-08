@@ -37,6 +37,26 @@ class BaseHintsManager(object):
         self.strategy.log(message)
     
     
+    def is_duplicate(self, card):
+        """
+        Says if the given card is owned by some player who knows everything about it.
+        """
+        # check other players' hands
+        for (player_id, hand) in self.strategy.hands.iteritems():
+            for card_pos in xrange(self.k):
+                kn = self.knowledge[player_id][card_pos]
+                if kn.knows_exactly() and hand[card_pos] is not None and hand[card_pos].equals(card):
+                    return True
+        
+        # check my hand
+        for card_pos in xrange(self.k):
+            kn = self.knowledge[self.id][card_pos]
+            if kn.knows_exactly() and any(card.equals(c) for c in self.strategy.possibilities[card_pos]):
+                return True
+        
+        return False
+    
+    
     def is_usable(self, hinter_id):
         """
         Check that it is possible to pass all the information.
@@ -163,6 +183,7 @@ class SumBasedHintsManager(BaseHintsManager):
         
         In case a value is not unique in the hand, color means leftmost card and number means rightmost card.
         """
+        # TODO: prefer hints on more than one card (in this way, more information is passed)
         
         assert player_id != self.id
         hand = self.hands[player_id]
@@ -322,26 +343,6 @@ class ValueHintsManager(BaseHintsManager):
     def shift(self, turn):
         # a variable shift in the hint
         return turn + turn / self.num_players
-    
-    
-    def is_duplicate(self, card):
-        """
-        Says if the given card is owned by some player who knows everything about it.
-        """
-        # check other players
-        for (player_id, hand) in self.strategy.hands.iteritems():
-            for card_pos in xrange(self.k):
-                kn = self.knowledge[player_id][card_pos]
-                if kn.color and kn.number and hand[card_pos] is not None and hand[card_pos].equals(card):
-                    return True
-        
-        # check my hand
-        for card_pos in xrange(self.k):
-            kn = self.knowledge[self.id][card_pos]
-            if kn.color and kn.number and any(card.equals(c) for c in self.strategy.possibilities[card_pos]):
-                return True
-        
-        return False
     
     
     def choose_card(self, player_id, target_id, turn, hint_type):
@@ -609,7 +610,7 @@ class ValueHintsManager(BaseHintsManager):
 
         if len(possibilities) > 0:
             score, action = sorted(possibilities.itervalues(), key = lambda x: x[0])[-1]
-            self.log("giving indirect hint on %d cards with score %d, %d" % (score[2], score[0], score[1]))
+            self.log("give value hint on %d cards with score %d, %d" % (score[2], score[0], score[1]))
             return action
         
         else:
@@ -622,14 +623,14 @@ class ValueHintsManager(BaseHintsManager):
 class PlayabilityHintsManager(SumBasedHintsManager):
     """
     Playability hints manager.
-    A hint communicates to every other player which of their cards are playable.
+    A hint communicates to every other player which of their cards are playable (duplicate cards are excluded).
     """
     
     def hash(self, hand):
         """
         This hash encodes which cards are playable (as a binary integer).
         """
-        string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
+        string = "".join(["1" if card.playable(self.board) and not self.is_duplicate(card) else "0" for card in hand])
         return int(string, 2)
     
     
@@ -654,20 +655,13 @@ class PlayabilityHintsManager(SumBasedHintsManager):
         for (card_pos, playable) in enumerate(playable_list):
             for card in self.full_deck:
                 p = self.possibilities[card_pos]
-                if card in p and (playable and not card.playable(self.board) or not playable and card.playable(self.board)):
-                    # self.log("removing %r from position %d" % (card, card_pos))
-                    p.remove(card)
-                
-                # TODO: take into account duplicate cards! (should not be considered playable)
-                
-                """
-                if card.playable(self.board) and card in self.possibilities[non_playable] and not self.is_duplicate(card):
-                    # self.log("removing %r from position %d" % (card, non_playable))
-                    self.possibilities[non_playable].remove(card)
-                elif not card.playable(self.board) and card in self.possibilities[playable] and not self.is_duplicate(card):
-                    # self.log("removing %r from position %d" % (card, playable))
-                    self.possibilities[playable].remove(card)
-                """
+                if card in p:
+                    if playable and (not card.playable(self.board) or self.is_duplicate(card)):
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                        p.remove(card)
+                    elif not playable and card.playable(self.board) and not self.is_duplicate(card):
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                        p.remove(card)
         
         # return data for update_knowledge
         return playable_list

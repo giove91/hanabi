@@ -33,11 +33,20 @@ class Knowledge:
     
     
     def knows(self, hint_type):
+        """
+        Does the player know the color/number?
+        """
         assert hint_type in Action.HINT_TYPES
         if hint_type == Action.COLOR:
             return self.color
         else:
             return self.number
+    
+    def knows_exactly(self):
+        """
+        Does the player know exactly this card?
+        """
+        return self.color and (self.number or self.playable)
 
 
 
@@ -67,6 +76,8 @@ class HintsScheduler:
         """
         Select the suitable hints manager to be used this time.
         """
+        if turn % 2 == 0:
+            return self.value_hints_manager
         if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):
             return self.playability_hints_manager
         else:
@@ -275,7 +286,7 @@ class Strategy(BaseStrategy):
         assert len(best_cards_pos) > 0
         useful_weight, card_pos = sorted(best_cards_pos)[0]
         
-        self.log("discard a card (relevant weight ~%.3f, useful weight %.3f)" % (best_relevant_weight, useful_weight))
+        self.log("considering to discard a card (pos %d, relevant weight ~%.3f, useful weight %.3f)" % (card_pos, best_relevant_weight, useful_weight))
         return card_pos, relevant_weight, useful_weight
     
     
