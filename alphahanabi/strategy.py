@@ -63,7 +63,7 @@ class HintsScheduler:
         self.playability_hints_manager = PlayabilityHintsManager(strategy)
     
     
-    def select_hints_manager(self):
+    def select_hints_manager(self, current_player, turn):
         """
         Select the suitable hints manager to be used this time.
         """
@@ -219,7 +219,7 @@ class Strategy(BaseStrategy):
         elif action.type == Action.HINT:
             # someone gave a hint!
             # the suitable hints manager must process it
-            hints_manager = self.hints_scheduler.select_hints_manager()
+            hints_manager = self.hints_scheduler.select_hints_manager(player_id, action.turn)
             hints_manager.receive_hint(player_id, action)
         
         # update possibilities with visible cards
@@ -430,7 +430,8 @@ class Strategy(BaseStrategy):
         
         
         # try to give hint, using the right hints manager
-        hints_manager = self.hints_scheduler.select_hints_manager()
+        hints_manager = self.hints_scheduler.select_hints_manager(self.id, self.turn)
+        assert hints_manager.is_usable(self.id)
         hint_action = hints_manager.get_hint()
         
         if hint_action is not None:

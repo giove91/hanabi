@@ -37,6 +37,13 @@ class BaseHintsManager(object):
         self.strategy.log(message)
     
     
+    def is_usable(self, hinter_id):
+        """
+        Check that it is possible to pass all the information.
+        """
+        return True
+    
+    
     def receive_hint(self, player_id, action):
         """
         Receive hint given by player_id and update knowledge.
@@ -90,6 +97,14 @@ class SumBasedHintsManager(BaseHintsManager):
         raise NotImplementedError
     
     
+    def hash_range(self):
+        """
+        Return H such that 0 <= hash < H.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
     def process_hash(self, x):
         """
         Process the given hash of my hand, passed through a hint.
@@ -106,6 +121,14 @@ class SumBasedHintsManager(BaseHintsManager):
         """
         # To be overloaded by child classes.
         raise NotImplementedError
+    
+    
+    
+    def is_usable(self, hinter_id):
+        """
+        Check if there are enough cards to pass all the information.
+        """
+        return self.hash_range() <= self.modulo(hinter_id)
     
     
     def compute_hash_sum(self, hinter_id):
@@ -608,6 +631,13 @@ class PlayabilityHintsManager(SumBasedHintsManager):
         """
         string = "".join(["1" if card.playable(self.board) else "0" for card in hand])
         return int(string, 2)
+    
+    
+    def hash_range(self):
+        """
+        Return H such that 0 <= hash < H.
+        """
+        return 2 ** self.k
     
     
     def process_hash(self, x):
