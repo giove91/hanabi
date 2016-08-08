@@ -349,7 +349,7 @@ class ValueHintsManager(BaseHintsManager):
         """
         Choose which of the target's cards receive a hint from the current player in the given turn.
         """
-        hand = new_card = self.my_hand if target_id == self.id else self.hands[target_id]
+        hand = self.my_hand if target_id == self.id else self.hands[target_id]
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if hand[card_pos] is not None and not (kn.color if hint_type == Action.COLOR else kn.number)]
         
         if len(possible_cards) == 0:
@@ -695,3 +695,67 @@ class PlayabilityHintsManager(SumBasedHintsManager):
                     kn.non_playable = True
     
 
+
+
+
+class CardHintsManager(SumBasedHintsManager):
+    """
+    Card hints manager.
+    A hint communicates to every other player information about one of his cards.
+    Specifically it says:
+    - if the card is unseless;
+    - which card is it (if it is playable or will be playable soon);
+    - if the card will not be playable soon.
+    """
+    
+    def choose_card(self, player_id, target_id, turn):
+        """
+        Choose which of the target's cards receive a hint from the current player in the given turn.
+        """
+        hand = self.my_hand if target_id == self.id else self.hands[target_id]
+        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if hand[card_pos] is not None and not kn.knows_exactly()]
+        
+        if len(possible_cards) == 0:
+            # do not give hints
+            return None
+        
+        # TODO: forse usare un vero hash
+        n = turn * 11**3 + (0 if hint_type == Action.COLOR else 1) * 119 + player_id * 11 + target_id
+        
+        return possible_cards[n % len(possible_cards)]
+    
+    
+    def hash(self, hand):
+        """
+        The hash of the hand that we want to communicate.
+        Must be an integer.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def hash_range(self):
+        """
+        Return H such that 0 <= hash < H.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def process_hash(self, x):
+        """
+        Process the given hash of my hand, passed through a hint.
+        Optionally, return data to be used by update_knowledge.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def update_knowledge(self, hinter_id, data=None):
+        """
+        Update knowledge after a hint has been given.
+        Optionally, get data from process_hash.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
