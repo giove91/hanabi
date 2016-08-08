@@ -108,7 +108,7 @@ class SumBasedHintsManager(BaseHintsManager):
     in the choice of the card to give a hint about.
     """
     
-    def hash(self, hand):
+    def hash(self, hand, player_id=None):
         """
         The hash of the hand that we want to communicate.
         Must be an integer.
@@ -158,9 +158,9 @@ class SumBasedHintsManager(BaseHintsManager):
         res = 0
         for (player_id, hand) in self.hands.iteritems():
             if player_id != hinter_id:
-                h = self.hash(hand)
+                h = self.hash(hand, player_id)
                 assert 0 <= h < self.modulo(hinter_id)
-                res += self.hash(hand)
+                res += h
         return res
     
     
@@ -626,7 +626,7 @@ class PlayabilityHintsManager(SumBasedHintsManager):
     A hint communicates to every other player which of their cards are playable (duplicate cards are excluded).
     """
     
-    def hash(self, hand):
+    def hash(self, hand, player_id=None):
         """
         This hash encodes which cards are playable (as a binary integer).
         """
@@ -714,18 +714,18 @@ class CardHintsManager(SumBasedHintsManager):
         """
         hand = self.my_hand if target_id == self.id else self.hands[target_id]
         possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if hand[card_pos] is not None and not kn.knows_exactly()]
+        # TODO: choose better the possible cards
         
         if len(possible_cards) == 0:
             # do not give hints
             return None
         
-        # TODO: forse usare un vero hash
-        n = turn * 11**3 + (0 if hint_type == Action.COLOR else 1) * 119 + player_id * 11 + target_id
+        n = hash("%d,%d,%d" % (player_id, target_id, turn))
         
         return possible_cards[n % len(possible_cards)]
     
     
-    def hash(self, hand):
+    def hash(self, hand, player_id):
         """
         The hash of the hand that we want to communicate.
         Must be an integer.
