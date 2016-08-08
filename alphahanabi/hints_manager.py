@@ -38,13 +38,6 @@ class BaseHintsManager(object):
         self.strategy.log(message)
     
     
-    def is_appropriate(self, player_id, action):
-        """
-        Returns True iff the given hint should be processed by this HintsManager.
-        """
-        raise NotImplementedError
-    
-    
     def receive_hint(self, player_id, action):
         """
         Receive hint given by player_id and update knowledge.
@@ -78,6 +71,190 @@ class BaseHintsManager(object):
     
 
 
+class SumBasedHintsManager(BaseHintsManager):
+    """
+    A HintManager which is based on the following idea.
+    Associate an integer (between 0 and M) to any possible hand. Send the sum of the integers
+    associated to the hands of the other players, modulo M. Then each other player can decode
+    its integer by difference, seeing the hands of the other players.
+    """
+    
+    def hash(self, hand):
+        """
+        The hash of the hand that we want to communicate.
+        Must be an integer.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def process_hash(self, x):
+        """
+        Process the given hash of my hand, passed through a hint.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def update_knowledge(self):
+        """
+        Update knowledge after a hint has been given.
+        """
+        # To be overloaded by child classes.
+        raise NotImplementedError
+    
+    
+    def compute_hash_sum(self, excluded=None):
+        """
+        Compute the sum of the hashes of the hands of the other players, possibly excluding one of them.
+        """
+        res = 0
+        for (player_id, hand) in self.hands.iteritems():
+            if player_id != excluded:
+                res += self.hash(hand)
+    
+    
+    def cards_to_hint(self, player_id):
+        """
+        For the given player (different from me) return a matching between each card and the hint (type and value)
+        to give in order to recognise that card.
+        
+        Example 1: 4 White, 4 Yellow, 3 Yellow, 2 Red.
+            4 White <-> White (color)
+            4 Yellow <-> 4 (number)
+            3 Yellow <-> 3 (number)
+            2 Red <-> Red (color)
+        
+        Example 2: 4 White, 4 White, 4 Yellow, 3 Yellow.
+            4 White <-> White (color)
+            4 White <-> None (both 4 and White would mean other cards)
+            4 Yellow <-> Yellow (color)
+            3 Yellow <-> 3 (number)
+        
+        In case a value is not unique in the hand, color means leftmost card and number means rightmost card.
+        """
+        
+        assert player_id != self.id
+        hand = self.hands[player_id]
+        
+        matching = {}
+        
+        # analyze hints on color
+        for color in Card.COLORS:
+            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card.matches(color=color)]
+            if len(cards_pos) > 0:
+                # pick the leftmost
+                card_pos = min(cards_pos)
+                matching[card_pos] = (Action.COLOR, color)
+                matching[(Action.COLOR, color)] = card_pos
+        
+        # analyze hints on numbers
+        for number in xrange(1, Card.NUM_NUMBERS+1):
+            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card.matches(number=number)]
+            if len(cards_pos) > 0:
+                # pick the rightmost
+                card_pos = max(cards_pos)
+                matching[card_pos] = (Action.NUMBER, number)
+                matching[(Action.NUMBER, number)] = card_pos
+        
+        return matching
+    
+    
+    def relevant_cards(self, hinter_id):
+        """
+        Matching between integers and cards of players other than the hinter, in the form (player_id, card_pos).
+        For example:
+            0: (0, 1)   # player 0, card 1
+            1: (0, 2)   # player 0, card 2
+            ...
+            (0, 1): 0
+            (0, 2): 1
+            ...
+        """
+        matching = {}
+        counter = 0
+        
+        for player_id in xrange(self.num_players):
+            if player_id == hinter_id:
+                # skip the hinter
+                continue
+            
+            if player_id == self.id:
+                hand = self.my_hand
+            else:
+                hand = self.hands[player_id]
+            
+            for (card_pos, card) in enumerate(hand):
+                if card is not None:
+                    matching[counter] = (player_id, card_pos)
+                    matching[(player_id, card_pos)] = counter
+        
+        return matching
+    
+    
+    def modulo(self, hinter_id):
+        """
+        Returns the number of different choices for the integer that needs to be communicated.
+        """
+        # for our protocol, such number is the number of cards of the other players
+        return len(self.relevant_cards(hinter_id)) / 2
+    
+    
+    def get_hint(self):
+        """
+        Compute hint to give.
+        """
+        x = self.compute_hash_sum() % self.modulo()
+        self.log("try to communicate integer %d" % x)
+        
+        relevant_cards = self.relevant_cards(self.id)
+        player_id, card_pos = relevant_cards[x]
+        
+        matching = self.cards_to_hint(player_id)
+        
+        if card_pos in matching:
+            hint_type, value = matching[card_pos]
+            return HintAction(player_id=player_id, hint_type=hint_type, value=value)
+        
+        else:
+            # unable to give hint on that card
+            return None
+    
+    
+    def hint_to_integer(self, hinter_id, action):
+        """
+        Decode an HintAction and get my integer.
+        """
+        # this only makes sense if I am not the hinter
+        assert self.id != hinter_id
+        
+        # compute passed integer
+        player_id = action.player_id
+        matching = self.cards_to_hints(player_id)
+        card_pos = matching[(action.hint_type, action.value)]
+        
+        relevant_cards = self.relevant_cards(hinter_id)
+        x = relevant_cards[(player_id, card_pos)]
+        
+        self.log("received integer %d" % x)
+        
+        # compute difference with other hashes
+        y = x - self.compute_hash_sum(excluded=hinter_id) % self.modulo()
+        
+        return y
+    
+    
+    def receive_hint(self, player_id, action):
+        if self.id != player_id:
+            # I am not the hinter
+            x = self.hint_to_integer(player_id, action)
+            self.process_hash(x)
+        
+        self.update_knowledge()
+        
+        super(SumBasedHintsManager, self).receive_hint(player_id, action)
+        
+
 
 
 class ValueHintsManager(BaseHintsManager):
@@ -94,13 +271,6 @@ class ValueHintsManager(BaseHintsManager):
     def __init__(self, *args, **kwargs):
         super(ValueHintsManager, self).__init__(*args, **kwargs)
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
-    
-    
-    def is_appropriate(self, player_id, action):
-        """
-        Returns True iff the given hint should be processed by this HintsManager.
-        """
-        return not (self.num_players == 5 and self.k == 4 and action.turn == 0)
     
     
     def shift(self, turn):
@@ -407,14 +577,6 @@ class PlayabilityHintsManager(BaseHintsManager):
     Playability hints manager.
     A hint communicates to every other player which of their cards are playable.
     """
-    
-    def is_appropriate(self, player_id, action):
-        """
-        Returns True iff the given hint should be processed by this HintsManager.
-        At the moment, it is used in the first turn of 5-player games.
-        """
-        return self.num_players == 5 and self.k == 4 and action.turn == 0
-    
     
     def card_to_hint_type(self, player_id):
         """
