@@ -17,6 +17,8 @@ SCORES = {
     3: 29,
 }
 
+difference = 0
+
 for (i, score) in SCORES.iteritems():
     game = Game(
             num_players=5,
@@ -33,5 +35,12 @@ for (i, score) in SCORES.iteritems():
     
     print "Game %d" % i
     print statistics
-    assert statistics.score == score
+    
+    diff = statistics.score - score
+    difference += diff
+    
+    print "Old score: %d (%d)" % (score, diff)
+
+print
+print "Difference: %d" % difference
 
