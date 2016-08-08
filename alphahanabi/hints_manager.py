@@ -77,6 +77,9 @@ class SumBasedHintsManager(BaseHintsManager):
     Associate an integer (between 0 and M) to any possible hand. Send the sum of the integers
     associated to the hands of the other players, modulo M. Then each other player can decode
     its integer by difference, seeing the hands of the other players.
+    
+    With this implementation, M = number of cards of the other players. The integer is encoded
+    in the choice of the card to give a hint about.
     """
     
     def hash(self, hand):
@@ -112,24 +115,25 @@ class SumBasedHintsManager(BaseHintsManager):
         for (player_id, hand) in self.hands.iteritems():
             if player_id != excluded:
                 res += self.hash(hand)
+        return res
     
     
-    def cards_to_hint(self, player_id):
+    def cards_to_hints(self, player_id):
         """
         For the given player (different from me) return a matching between each card and the hint (type and value)
         to give in order to recognise that card.
         
         Example 1: 4 White, 4 Yellow, 3 Yellow, 2 Red.
-            4 White <-> White (color)
-            4 Yellow <-> 4 (number)
-            3 Yellow <-> 3 (number)
-            2 Red <-> Red (color)
+            4 White -> White (color)
+            4 Yellow -> 4 (number)
+            3 Yellow -> 3 (number)
+            2 Red -> Red (color)
         
         Example 2: 4 White, 4 White, 4 Yellow, 3 Yellow.
-            4 White <-> White (color)
-            4 White <-> None (both 4 and White would mean other cards)
-            4 Yellow <-> Yellow (color)
-            3 Yellow <-> 3 (number)
+            4 White -> White (color)
+            4 White -> None (both 4 and White would mean other cards)
+            4 Yellow -> Yellow (color)
+            3 Yellow -> 3 (number)
         
         In case a value is not unique in the hand, color means leftmost card and number means rightmost card.
         """
@@ -160,6 +164,19 @@ class SumBasedHintsManager(BaseHintsManager):
         return matching
     
     
+    def hint_to_card(self, action):
+        """
+        From the hint, understand the important card.
+        This is the inverse of cards_to_hints.
+        """
+        if action.hint_type == Action.COLOR:
+            # pick the leftmost card
+            return min(action.cards_pos)
+        else:
+            # pick the rightmost card
+            return max(action.cards_pos)
+        
+    
     def relevant_cards(self, hinter_id):
         """
         Matching between integers and cards of players other than the hinter, in the form (player_id, card_pos).
@@ -188,6 +205,7 @@ class SumBasedHintsManager(BaseHintsManager):
                 if card is not None:
                     matching[counter] = (player_id, card_pos)
                     matching[(player_id, card_pos)] = counter
+                    counter += 1
         
         return matching
     
@@ -204,13 +222,13 @@ class SumBasedHintsManager(BaseHintsManager):
         """
         Compute hint to give.
         """
-        x = self.compute_hash_sum() % self.modulo()
-        self.log("try to communicate integer %d" % x)
+        x = self.compute_hash_sum() % self.modulo(self.id)
+        self.log("communicate message %d" % x)
         
         relevant_cards = self.relevant_cards(self.id)
         player_id, card_pos = relevant_cards[x]
         
-        matching = self.cards_to_hint(player_id)
+        matching = self.cards_to_hints(player_id)
         
         if card_pos in matching:
             hint_type, value = matching[card_pos]
@@ -230,16 +248,15 @@ class SumBasedHintsManager(BaseHintsManager):
         
         # compute passed integer
         player_id = action.player_id
-        matching = self.cards_to_hints(player_id)
-        card_pos = matching[(action.hint_type, action.value)]
+        card_pos = self.hint_to_card(action)
         
         relevant_cards = self.relevant_cards(hinter_id)
         x = relevant_cards[(player_id, card_pos)]
         
-        self.log("received integer %d" % x)
+        self.log("received message %d" % x)
         
         # compute difference with other hashes
-        y = x - self.compute_hash_sum(excluded=hinter_id) % self.modulo()
+        y = x - self.compute_hash_sum(excluded=hinter_id) % self.modulo(hinter_id)
         
         return y
     
@@ -248,12 +265,37 @@ class SumBasedHintsManager(BaseHintsManager):
         if self.id != player_id:
             # I am not the hinter
             x = self.hint_to_integer(player_id, action)
+            self.log("the hash of my hand is %d" % x)
             self.process_hash(x)
         
         self.update_knowledge()
         
         super(SumBasedHintsManager, self).receive_hint(player_id, action)
         
+
+
+class DummyHintsManager(SumBasedHintsManager):
+    def hash(self, hand):
+        """
+        The hash of the hand that we want to communicate.
+        Must be an integer.
+        """
+        return sum(card.number for card in hand if card is not None) % 5
+    
+    
+    def process_hash(self, x):
+        """
+        Process the given hash of my hand, passed through a hint.
+        """
+        pass
+    
+    
+    def update_knowledge(self):
+        """
+        Update knowledge after a hint has been given.
+        """
+        pass
+    
 
 
 
