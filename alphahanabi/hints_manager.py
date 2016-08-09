@@ -889,8 +889,7 @@ class CardHintsManager(SumBasedHintsManager):
         Optionally, get data from process_hash.
         """
         # matching = self.hint_matching(self.board, self.knowledge[self.id][card_pos], hinter_id)
-        pass
-        """
+        
         if hinter_id != self.id and data is not None:
             # update my knowledge
             card_pos, information = data
@@ -901,24 +900,36 @@ class CardHintsManager(SumBasedHintsManager):
             elif information == self.HIGH_RELEVANT or information == self.HIGH_DISCARDABLE:
                 kn.high = True
             else:
-                # know exactly the card
+                # I know exactly the card
                 kn.color = True
                 kn.number = True
-        """
-        """
+            
+        
+        
         # update knowledge of players different by me and the hinter
-        for (p_id, hand) in self.hands.iteritems():
-            if p_id == hinter_id:
+        for (player_id, hand) in self.hands.iteritems():
+            if player_id == hinter_id:
                 # skip the hinter
                 continue
             
-            for (card_pos, card) in enumerate(hand):
-                kn = self.knowledge[p_id][card_pos]
-                if card.playable(self.board):
-                    kn.playable = True
+            card_pos = self.choose_card(player_id, self.strategy.turn)
+            if card_pos is not None:
+                card = hand[card_pos]
+                kn = self.knowledge[player_id][card_pos]
+                matching = self.hint_matching(self.board, kn, hinter_id)
+                
+                if (card.color, card.number) in matching:
+                    # hint on the exact values
+                    kn.color = True
+                    kn.number = True
+                
+                elif not card.useful(self.board, self.full_deck, self.discard_pile):
+                    # the card is useless
+                    kn.useless = True
+                
                 else:
-                    kn.non_playable = True
-        """
+                    # the card is high
+                    kn.high = True
 
 
     
