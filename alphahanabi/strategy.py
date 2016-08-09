@@ -11,7 +11,7 @@ sys.path.append("..")
 from action import Action, PlayAction, DiscardAction, HintAction
 from card import Card, deck
 from base_strategy import BaseStrategy
-from hints_manager import ValueHintsManager, PlayabilityHintsManager
+from hints_manager import ValueHintsManager, PlayabilityHintsManager, CardHintsManager
 
 
 
@@ -21,15 +21,20 @@ class Knowledge:
     An instance of this class represents what a player knows about a card, as known by everyone.
     """
     
-    def __init__(self, color=False, number=False, playable=False, non_playable=False):
-        self.color = color
-        self.number = number
-        self.playable = playable
-        self.non_playable = non_playable
+    def __init__(self, color=False, number=False):
+        self.color = color                  # know the color
+        self.number = number                # know the number
+        self.playable = False               # at some point, this card was playable
+        self.non_playable = False           # at some point, this card was not playable
+        self.useless = False                # this card is useless
+        self.high = False                   # at some point, this card was high (see CardHintsManager)
+        
         # TODO: most of the time, knowing "playable" is equivalent to knowing "number"
+        # and knowing "useless" is equivalent to knowing the entire card
+    
     
     def __repr__(self):
-        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("P" if self.playable else "-") + ("Q" if self.non_playable else "-")
+        return ("C" if self.color else "-") + ("N" if self.number else "-") + ("P" if self.playable else "-") + ("Q" if self.non_playable else "-") + ("L" if self.useless else "-") + ("H" if self.high else "-")
     
     
     def knows(self, hint_type):
@@ -65,17 +70,20 @@ class HintsScheduler:
         self.hands = strategy.hands
         self.full_deck = strategy.full_deck
         self.board = strategy.board
+        self.discard_pile = strategy.discard_pile
         self.knowledge = strategy.knowledge
         
         # hints manager(s)
         self.value_hints_manager = ValueHintsManager(strategy)
         self.playability_hints_manager = PlayabilityHintsManager(strategy)
+        self.card_hints_manager = CardHintsManager(strategy)
     
     
     def select_hints_manager(self, player_id, turn):
         """
         Select the suitable hints manager to be used this time.
         """
+        return self.card_hints_manager
         if turn % 2 == 0:
             return self.value_hints_manager
         if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):

@@ -28,6 +28,7 @@ class BaseHintsManager(object):
         self.possibilities = strategy.possibilities
         self.full_deck = strategy.full_deck
         self.board = strategy.board
+        self.discard_pile = strategy.discard_pile
         self.knowledge = strategy.knowledge
         
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
@@ -108,7 +109,7 @@ class SumBasedHintsManager(BaseHintsManager):
     in the choice of the card to give a hint about.
     """
     
-    def hash(self, hand, player_id=None):
+    def hash(self, hand, player_id, hinter_id):
         """
         The hash of the hand that we want to communicate.
         Must be an integer.
@@ -117,7 +118,7 @@ class SumBasedHintsManager(BaseHintsManager):
         raise NotImplementedError
     
     
-    def hash_range(self):
+    def hash_range(self, hinter_id):
         """
         Return H such that 0 <= hash < H.
         """
@@ -125,7 +126,7 @@ class SumBasedHintsManager(BaseHintsManager):
         raise NotImplementedError
     
     
-    def process_hash(self, x):
+    def process_hash(self, x, hinter_id):
         """
         Process the given hash of my hand, passed through a hint.
         Optionally, return data to be used by update_knowledge.
@@ -148,7 +149,7 @@ class SumBasedHintsManager(BaseHintsManager):
         """
         Check if there are enough cards to pass all the information.
         """
-        return self.hash_range() <= self.modulo(hinter_id)
+        return self.hash_range(hinter_id) <= self.modulo(hinter_id)
     
     
     def compute_hash_sum(self, hinter_id):
@@ -158,7 +159,7 @@ class SumBasedHintsManager(BaseHintsManager):
         res = 0
         for (player_id, hand) in self.hands.iteritems():
             if player_id != hinter_id:
-                h = self.hash(hand, player_id)
+                h = self.hash(hand, player_id, hinter_id)
                 assert 0 <= h < self.modulo(hinter_id)
                 res += h
         return res
@@ -192,7 +193,7 @@ class SumBasedHintsManager(BaseHintsManager):
         
         # analyze hints on color
         for color in Card.COLORS:
-            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card.matches(color=color)]
+            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card is not None and card.matches(color=color)]
             if len(cards_pos) > 0:
                 # pick the leftmost
                 card_pos = min(cards_pos)
@@ -201,7 +202,7 @@ class SumBasedHintsManager(BaseHintsManager):
         
         # analyze hints on numbers
         for number in xrange(1, Card.NUM_NUMBERS+1):
-            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card.matches(number=number)]
+            cards_pos = [card_pos for (card_pos, card) in enumerate(hand) if card is not None and card.matches(number=number)]
             if len(cards_pos) > 0:
                 # pick the rightmost
                 card_pos = max(cards_pos)
@@ -313,7 +314,7 @@ class SumBasedHintsManager(BaseHintsManager):
             # I am not the hinter
             x = self.hint_to_integer(player_id, action)
             # self.log("the hash of my hand is %d" % x)
-            data = self.process_hash(x)
+            data = self.process_hash(x, player_id)
         else:
             data = None
         
@@ -626,7 +627,7 @@ class PlayabilityHintsManager(SumBasedHintsManager):
     A hint communicates to every other player which of their cards are playable (duplicate cards are excluded).
     """
     
-    def hash(self, hand, player_id=None):
+    def hash(self, hand, player_id, hinter_id):
         """
         This hash encodes which cards are playable (as a binary integer).
         """
@@ -634,14 +635,14 @@ class PlayabilityHintsManager(SumBasedHintsManager):
         return int(string, 2)
     
     
-    def hash_range(self):
+    def hash_range(self, hinter_id):
         """
         Return H such that 0 <= hash < H.
         """
         return 2 ** self.k
     
     
-    def process_hash(self, x):
+    def process_hash(self, x, hinter_id):
         """
         Process the given hash of my hand, passed through a hint.
         """
@@ -708,7 +709,12 @@ class CardHintsManager(SumBasedHintsManager):
     - if the card will not be playable soon.
     """
     
-    def choose_card(self, player_id, target_id, turn):
+    USELESS = 'Useless'
+    HIGH_DISCARDABLE = 'High discardable'
+    HIGH_RELEVANT = 'High relevant'
+    
+    
+    def choose_card(self, target_id, turn):
         """
         Choose which of the target's cards receive a hint from the current player in the given turn.
         """
@@ -720,35 +726,161 @@ class CardHintsManager(SumBasedHintsManager):
             # do not give hints
             return None
         
-        n = hash("%d,%d,%d" % (player_id, target_id, turn))
+        n = hash("%d,%d" % (target_id, turn))
         
         return possible_cards[n % len(possible_cards)]
     
     
-    def hash(self, hand, player_id):
+    def hint_matching(self, board, kn, hinter_id):
+        """
+        Matching between integers and information about a card, which depends only on the board,
+        the knowledge and the hinter.
+        The information is of the form:
+        - USELESS if the card is useless;
+        - (color, number) if the card is playable or will be playable soon;
+        - HIGH_DISCARDABLE if the card will not be playable soon, and is not relevant;
+        - HIGH_RELEVANT if the card will not be playable soon, and is relevant.
+        For example:
+            0: USELESS
+            1: HIGH_DISCARDABLE
+            2: HIGH_RELEVANT
+            3: (WHITE, 2)
+            ...
+            USELESS: 0
+            HIGH_DISCARDABLE: 1
+            HIGH_RELEVANT: 2
+            (WHITE, 2): 3
+            ...
+        """
+        # TODO: if the player already knows something, we should take it into account
+        
+        matching = {}
+        counter = 0
+        
+        # useless
+        matching[counter] = self.USELESS
+        matching[self.USELESS] = counter
+        counter += 1
+        
+        # high discardable
+        matching[counter] = self.HIGH_DISCARDABLE
+        matching[self.HIGH_DISCARDABLE] = counter
+        counter += 1
+        
+        # high relevant
+        matching[counter] = self.HIGH_RELEVANT
+        matching[self.HIGH_RELEVANT] = counter
+        counter += 1
+        
+        fake_board = copy.copy(board)
+        c = 0
+        
+        while counter < self.modulo(hinter_id) and sum(Card.NUM_NUMBERS - n for n in fake_board.itervalues()) > 0:
+            # pick next color
+            color = Card.COLORS[c % Card.NUM_COLORS]
+            c += 1
+            
+            number = fake_board[color] + 1
+            
+            if number <= Card.NUM_NUMBERS:
+                # this color still has useful cards!
+                matching[counter] = (color, number)
+                matching[(color, number)] = counter
+                counter += 1
+                fake_board[color] += 1
+        
+        return matching
+    
+    
+    def hash(self, hand, player_id, hinter_id):
         """
         The hash of the hand that we want to communicate.
         Must be an integer.
         """
-        # To be overloaded by child classes.
-        raise NotImplementedError
+        card_pos = self.choose_card(player_id, self.strategy.turn)
+        if card_pos is None:
+            # no information
+            return 0
+        
+        matching = self.hint_matching(self.board, self.knowledge[player_id][card_pos], hinter_id)
+        
+        card = hand[card_pos]
+        if (card.color, card.number) in matching:
+            # hint on the exact values
+            return matching[card.color, card.number]
+        
+        elif not card.useful(self.board, self.full_deck, self.discard_pile):
+            # the card is useless
+            return matching[self.USELESS]
+        
+        elif card.relevant(self.board, self.full_deck, self.discard_pile):
+            # the card is high and relevant
+            return matching[self.HIGH_RELEVANT]
+        
+        else:
+            # the card is high and discardable
+            return matching[self.HIGH_DISCARDABLE]
     
     
-    def hash_range(self):
+    def hash_range(self, hinter_id):
         """
         Return H such that 0 <= hash < H.
+        In this hints manager, the range is exactly how much information we can pass (but at least 3).
         """
-        # To be overloaded by child classes.
-        raise NotImplementedError
+        return max(self.modulo(hinter_id), 3)
     
     
-    def process_hash(self, x):
+    def process_hash(self, x, hinter_id):
         """
         Process the given hash of my hand, passed through a hint.
         Optionally, return data to be used by update_knowledge.
         """
-        # To be overloaded by child classes.
-        raise NotImplementedError
+        card_pos = self.choose_card(self.id, self.strategy.turn)
+        if card_pos is None:
+            # no information passed
+            return None
+        
+        matching = self.hint_matching(self.board, self.knowledge[self.id][card_pos], hinter_id)
+        information = matching[x]
+        
+        self.log("obtained information on card %d, %r" % (card_pos, information))
+        
+        # update possibilities
+        p = self.possibilities[card_pos]
+        for card in self.full_deck:
+            if card in p:
+                if information == self.USELESS:
+                    if card.useful(self.board, self.full_deck, self.discard_pile):
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                
+                elif information == self.HIGH_RELEVANT:
+                    if (card.color, card.number) in matching:
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                    elif not card.relevant(self.board, self.full_deck, self.discard_pile):
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                
+                elif information == self.HIGH_DISCARDABLE:
+                    if (card.color, card.number) in matching:
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                    elif card.relevant(self.board, self.full_deck, self.discard_pile):
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                    elif not card.useful(self.board, self.full_deck, self.discard_pile):
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+                
+                else:
+                    # I know the card exactly
+                    color, number = information
+                    if not card.matches_both(color=color, number=number):
+                        p.remove(card)
+                        # self.log("removing %r from position %d" % (card, card_pos))
+        
+        return card_pos, information
     
     
     def update_knowledge(self, hinter_id, data=None):
@@ -756,6 +888,37 @@ class CardHintsManager(SumBasedHintsManager):
         Update knowledge after a hint has been given.
         Optionally, get data from process_hash.
         """
-        # To be overloaded by child classes.
-        raise NotImplementedError
+        # matching = self.hint_matching(self.board, self.knowledge[self.id][card_pos], hinter_id)
+        pass
+        """
+        if hinter_id != self.id and data is not None:
+            # update my knowledge
+            card_pos, information = data
+            kn = self.knowledge[self.id][card_pos]
+            
+            if information == self.USELESS:
+                kn.useless = True
+            elif information == self.HIGH_RELEVANT or information == self.HIGH_DISCARDABLE:
+                kn.high = True
+            else:
+                # know exactly the card
+                kn.color = True
+                kn.number = True
+        """
+        """
+        # update knowledge of players different by me and the hinter
+        for (p_id, hand) in self.hands.iteritems():
+            if p_id == hinter_id:
+                # skip the hinter
+                continue
+            
+            for (card_pos, card) in enumerate(hand):
+                kn = self.knowledge[p_id][card_pos]
+                if card.playable(self.board):
+                    kn.playable = True
+                else:
+                    kn.non_playable = True
+        """
+
+
     

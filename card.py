@@ -64,6 +64,12 @@ class Card:
         # does this card match the given color/number?
         return color == self.color or number == self.number
     
+    
+    def matches_both(self, color, number):
+        # does this card match both the given color and the given number?
+        return color == self.color and number == self.number
+    
+    
     def matches_hint(self, action, card_pos):
         # does this card (in the given position) match the given hint?
         assert action.type == Action.HINT
