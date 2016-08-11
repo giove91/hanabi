@@ -13,6 +13,7 @@ if __name__ == "__main__":
     strategy_log = False
     dump_deck_to = "deck.txt"
     load_deck_from = None
+    short_log = False
     
     repeat = None  # repeat until a bad result is reached
     
@@ -28,6 +29,9 @@ if __name__ == "__main__":
     
     if '-s' in sys.argv[1:]:
         strategy_log = True
+    
+    if '-t' in sys.argv[1:]:
+        short_log = True
     
     if '-l' in sys.argv[1:]:
         # load deck from file
@@ -66,10 +70,13 @@ if __name__ == "__main__":
                 strategy_log=strategy_log,
                 dump_deck_to=dump_deck_to,
                 load_deck_from=load_deck_from,
+                short_log=short_log,
             )
 
         game.setup()
-        game.log_deck()
+        
+        if not short_log:
+            game.log_deck()
         statistics = game.run_game()
         
         print statistics

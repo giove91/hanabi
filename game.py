@@ -21,7 +21,7 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, ai="alphahanabi", wait_key=True, log=True, strategy_log=False, dump_deck_to=None, load_deck_from=None):
+    def __init__(self, num_players, ai="alphahanabi", wait_key=True, log=True, strategy_log=False, dump_deck_to=None, load_deck_from=None, short_log=False):
         self.num_players = num_players
         self.ai = ai
         
@@ -30,6 +30,7 @@ class Game:
         self.strategy_log = strategy_log    # log messages from strategy to standard output
         self.dump_deck_to = dump_deck_to    # if not None, dump the initial deck to the given file
         self.load_deck_from = load_deck_from    # if not None, load the initial deck from the given file
+        self.short_log = short_log  # if True, the log of the game is less verbose
         
         # compute number of cards per player
         self.k = self.CARDS_PER_PLAYER[num_players]
@@ -186,6 +187,9 @@ class Game:
         
         print
     
+    def log_turn_short(self, turn, player):
+        print "Turn %d (player %d): %s" % (self.get_current_turn(), player.id, turn.action.type)
+    
     
     def log_status(self):
         from termcolor import colored
@@ -205,7 +209,10 @@ class Game:
             print
         
         print
-
+    
+    def log_status_short(self):
+        print "Hints: %d    Lives: %d    Deck: %d    Score: %d" % (self.hints, self.lives, len(self.deck), self.get_current_score())
+    
 
     def log_deck(self):
         print "Deck (last card on top):"
@@ -217,7 +224,8 @@ class Game:
         """
         Dump the initial deck to file.
         """
-        print "Dumping initial deck to %s" % filename
+        if self.log:
+            print "Dumping initial deck to %s" % filename
         file = open(filename, "w")
         
         # dump deck
@@ -243,7 +251,7 @@ class Game:
         end_game = False
         current_player = self.players[0]
         
-        if self.log:
+        if self.log and not self.short_log:
             self.log_status()
         
         while not end_game:
@@ -255,8 +263,12 @@ class Game:
             
             # log turn and status
             if self.log:
-                self.log_turn(turn, current_player)
-                self.log_status()
+                if self.short_log:
+                    self.log_turn_short(turn, current_player)
+                    self.log_status_short()
+                else:
+                    self.log_turn(turn, current_player)
+                    self.log_status()
             
             # inform all players
             for player in self.players:
