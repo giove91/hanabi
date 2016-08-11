@@ -20,7 +20,7 @@ Run a new game
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
 * `-c` run the game without pausing (otherwise, by default, each new turn is played by pressing ENTER)
 * `-s` activate the strategy log
-* `-t` short log of turns and status
+* `-t` print a shorter log of turns and status
 * `-l FILENAME` load the initial deck from the given file (otherwise, by default, the initial deck is shuffled randomly)
 * `-d FILENAME` dump the initial deck to the given file (default is `deck.txt`)
 * `-r SCORE` run many games, until a score <= to the given score is reached
