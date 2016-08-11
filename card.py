@@ -61,13 +61,12 @@ class Card:
     
     
     def matches(self, color=None, number=None):
-        # does this card match the given color/number?
-        return color == self.color or number == self.number
-    
-    
-    def matches_both(self, color, number):
-        # does this card match both the given color and the given number?
-        return color == self.color and number == self.number
+        # does this card match the given color/number? (if the value is None, it is considered to match)
+        if color is not None and self.color != color:
+            return False
+        if number is not None and self.number != number:
+            return False
+        return True
     
     
     def matches_hint(self, action, card_pos):

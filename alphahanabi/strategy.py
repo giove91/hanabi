@@ -81,13 +81,12 @@ class HintsScheduler:
         Select the suitable hints manager to be used this time.
         """
         return self.card_hints_manager
-        if turn % 2 == 0:
-            return self.value_hints_manager
+        """
         if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):
             return self.playability_hints_manager
         else:
             return self.value_hints_manager
-
+        """
 
 
 class Strategy(BaseStrategy):

@@ -753,7 +753,8 @@ class CardHintsManager(SumBasedHintsManager):
         the knowledge and the hinter.
         The information is of the form:
         - USELESS if the card is useless;
-        - (color, number) if the card is playable or will be playable soon;
+        - (color, number) if the card is playable or will be playable soon
+                          (one of the two values can be None, if the player already knows something);
         - HIGH_DISCARDABLE if the card will not be playable soon, and is not relevant;
         - HIGH_RELEVANT if the card will not be playable soon, and is relevant.
         For example:
@@ -768,7 +769,6 @@ class CardHintsManager(SumBasedHintsManager):
             (WHITE, 2): 3
             ...
         """
-        # TODO: if the player already knows something, we should take it into account
         
         matching = {}
         counter = 0
@@ -788,22 +788,44 @@ class CardHintsManager(SumBasedHintsManager):
         matching[self.HIGH_RELEVANT] = counter
         counter += 1
         
-        fake_board = copy.copy(board)
-        c = 0
-        
-        while counter < self.modulo(hinter_id) and sum(Card.NUM_NUMBERS - n for n in fake_board.itervalues()) > 0:
-            # pick next color
-            color = Card.COLORS[c % Card.NUM_COLORS]
-            c += 1
-            
-            number = fake_board[color] + 1
-            
-            if number <= Card.NUM_NUMBERS:
-                # this color still has useful cards!
-                matching[counter] = (color, number)
-                matching[(color, number)] = counter
+        if kn.color:
+            # communicate the number
+            for number in xrange(1, Card.NUM_NUMBERS + 1):
+                if counter >= self.modulo(hinter_id):
+                    # reached maximum number of information available
+                    break
+                matching[counter] = (None, number)
+                matching[None, number] = counter
                 counter += 1
-                fake_board[color] += 1
+        
+        elif kn.number or kn.playable or kn.high:
+            # communicate the color
+            for color in Card.COLORS:
+                if counter >= self.modulo(hinter_id):
+                    # reached maximum number of information available
+                    break
+                matching[counter] = (color, None)
+                matching[color, None] = counter
+                counter += 1
+
+        else:
+            # communicate both color and number
+            fake_board = copy.copy(board)
+            c = 0
+            
+            while counter < self.modulo(hinter_id) and sum(Card.NUM_NUMBERS - n for n in fake_board.itervalues()) > 0:
+                # pick next color
+                color = Card.COLORS[c % Card.NUM_COLORS]
+                c += 1
+                
+                number = fake_board[color] + 1
+                
+                if number <= Card.NUM_NUMBERS:
+                    # this color still has useful cards!
+                    matching[counter] = (color, number)
+                    matching[(color, number)] = counter
+                    counter += 1
+                    fake_board[color] += 1
         
         return matching
     
@@ -824,6 +846,14 @@ class CardHintsManager(SumBasedHintsManager):
         if (card.color, card.number) in matching:
             # hint on the exact values
             return matching[card.color, card.number]
+        
+        elif (card.color, None) in matching:
+            # hint on color
+            return matching[card.color, None]
+        
+        elif (None, card.number) in matching:
+            # hint on number
+            return matching[None, card.number]
         
         elif not card.useful(self.board, self.full_deck, self.discard_pile):
             # the card is useless
@@ -871,7 +901,7 @@ class CardHintsManager(SumBasedHintsManager):
                         # self.log("removing %r from position %d" % (card, card_pos))
                 
                 elif information == self.HIGH_RELEVANT:
-                    if (card.color, card.number) in matching:
+                    if any(x in matching for x in [(card.color, card.number), (card.color, None), (None, card.number)]):
                         p.remove(card)
                         # self.log("removing %r from position %d" % (card, card_pos))
                     elif not card.relevant(self.board, self.full_deck, self.discard_pile):
@@ -879,7 +909,7 @@ class CardHintsManager(SumBasedHintsManager):
                         # self.log("removing %r from position %d" % (card, card_pos))
                 
                 elif information == self.HIGH_DISCARDABLE:
-                    if (card.color, card.number) in matching:
+                    if any(x in matching for x in [(card.color, card.number), (card.color, None), (None, card.number)]):
                         p.remove(card)
                         # self.log("removing %r from position %d" % (card, card_pos))
                     elif card.relevant(self.board, self.full_deck, self.discard_pile):
@@ -892,7 +922,7 @@ class CardHintsManager(SumBasedHintsManager):
                 else:
                     # I know the card exactly
                     color, number = information
-                    if not card.matches_both(color=color, number=number):
+                    if not card.matches(color=color, number=number):
                         p.remove(card)
                         # self.log("removing %r from position %d" % (card, card_pos))
         
@@ -904,7 +934,6 @@ class CardHintsManager(SumBasedHintsManager):
         Update knowledge after a hint has been given.
         Optionally, get data from process_hash.
         """
-        # matching = self.hint_matching(self.board, self.knowledge[self.id][card_pos], hinter_id)
         
         if hinter_id != self.id and data is not None:
             # update my knowledge
@@ -916,10 +945,13 @@ class CardHintsManager(SumBasedHintsManager):
             elif information == self.HIGH_RELEVANT or information == self.HIGH_DISCARDABLE:
                 kn.high = True
             else:
-                # I know exactly the card
-                kn.color = True
-                kn.number = True
-            
+                color, number = information
+                if color is not None:
+                    # I know the color
+                    kn.color = True
+                if number is not None:
+                    # I know the number
+                    kn.number = True
         
         
         # update knowledge of players different by me and the hinter
@@ -937,6 +969,14 @@ class CardHintsManager(SumBasedHintsManager):
                 if (card.color, card.number) in matching:
                     # hint on the exact values
                     kn.color = True
+                    kn.number = True
+                
+                elif (card.color, None) in matching:
+                    # hint on color
+                    kn.color = True
+                
+                elif (None, card.number) in matching:
+                    # hint on number
                     kn.number = True
                 
                 elif not card.useful(self.board, self.full_deck, self.discard_pile):
