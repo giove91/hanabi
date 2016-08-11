@@ -4,7 +4,6 @@
 import sys
 import random
 from collections import namedtuple
-from termcolor import colored
 
 from card import Card, deck
 from player import Player
@@ -189,6 +188,8 @@ class Game:
     
     
     def log_status(self):
+        from termcolor import colored
+        
         print "Hands:"
         for player in self.players:
             print "    Player %d" % player.id, player.hand

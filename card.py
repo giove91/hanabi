@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from termcolor import colored
 
 from action import Action
 
@@ -40,6 +39,7 @@ class Card:
     
     
     def __repr__(self):
+        from termcolor import colored
         return colored("%d %s" % (self.number, self.color), self.PRINTABLE_COLORS[self.color])
         # return colored("%d" % self.number, self.PRINTABLE_COLORS[self.color])
 
