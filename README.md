@@ -30,6 +30,8 @@ Run many games and print statistics
 ---------------------
 `python test.py`
 
+or (much faster)`pypy test.py`
+
 **Command line options**
 * `-n NUM_PLAYERS` change the number of players (default is 5)
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
