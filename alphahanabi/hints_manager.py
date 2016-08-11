@@ -719,15 +719,31 @@ class CardHintsManager(SumBasedHintsManager):
         Choose which of the target's cards receive a hint from the current player in the given turn.
         """
         hand = self.my_hand if target_id == self.id else self.hands[target_id]
-        possible_cards = [card_pos for (card_pos, kn) in enumerate(self.knowledge[target_id]) if hand[card_pos] is not None and not kn.knows_exactly()]
-        # TODO: choose better the possible cards
+        knowledge = self.knowledge[target_id]
+        n = hash("%d,%d" % (target_id, turn))
+        
+        possible_cards = [card_pos for (card_pos, kn) in enumerate(knowledge) if hand[card_pos] is not None and not kn.knows_exactly() and not kn.useless]
         
         if len(possible_cards) == 0:
             # do not give hints
             return None
         
-        n = hash("%d,%d" % (target_id, turn))
+        # try to restrict to cards on which we don't know (almost) anything
+        new_cards = [card_pos for card_pos in possible_cards if not knowledge[card_pos].high and not knowledge[card_pos].color and not knowledge[card_pos].number and not knowledge[card_pos].playable]
+        if len(new_cards) > 0:
+            return new_cards[n % len(new_cards)]
         
+        # try to restrict to non-high cards
+        new_cards = [card_pos for card_pos in possible_cards if not knowledge[card_pos].high]
+        if len(new_cards) > 0:
+            return new_cards[n % len(new_cards)]
+        
+        # try to restrict to cards on which we don't know (almost) anything apart from highness
+        new_cards = [card_pos for card_pos in possible_cards if not knowledge[card_pos].color and not knowledge[card_pos].number and not knowledge[card_pos].playable]
+        if len(new_cards) > 0:
+            return new_cards[n % len(new_cards)]
+        
+        # no further restriction
         return possible_cards[n % len(possible_cards)]
     
     

@@ -28,9 +28,6 @@ class Knowledge:
         self.non_playable = False           # at some point, this card was not playable
         self.useless = False                # this card is useless
         self.high = False                   # at some point, this card was high (see CardHintsManager)
-        
-        # TODO: most of the time, knowing "playable" is equivalent to knowing "number"
-        # and knowing "useless" is equivalent to knowing the entire card
     
     
     def __repr__(self):
