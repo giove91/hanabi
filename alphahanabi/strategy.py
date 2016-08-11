@@ -253,7 +253,7 @@ class Strategy(BaseStrategy):
         # first see if I can be sure to discard a useless card
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p):
-                self.log("discard useless card")
+                self.log("considering to discard useless card")
                 return card_pos, 0.0, 0.0
         
         # Try to avoid cards that are (on average) more relevant, then choose cards that are (on average) less useful

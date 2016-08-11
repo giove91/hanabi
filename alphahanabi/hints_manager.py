@@ -889,7 +889,7 @@ class CardHintsManager(SumBasedHintsManager):
         matching = self.hint_matching(self.board, self.knowledge[self.id][card_pos], hinter_id)
         information = matching[x]
         
-        self.log("obtained information on card %d, %r" % (card_pos, information))
+        self.log("obtained information about card %d, %r" % (card_pos, information))
         
         # update possibilities
         p = self.possibilities[card_pos]
