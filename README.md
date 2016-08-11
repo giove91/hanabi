@@ -16,7 +16,7 @@ Run a new game
 `python run_game.py`
 
 **Command line options**
-* `-n NUM_PLAYERS` choose number of players (default is 5)
+* `-n NUM_PLAYERS` set number of players (default is 5)
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
 * `-c` run the game without pausing (otherwise, by default, each new turn is played by pressing ENTER)
 * `-s` activate the strategy log
@@ -33,6 +33,6 @@ Run many games and print statistics
 or (much faster)`pypy test.py`
 
 **Command line options**
-* `-n NUM_PLAYERS` choose number of players (default is 5)
-* `-m NUM_GAMES` choose number of games (default is 1000)
+* `-n NUM_PLAYERS` set number of players (default is 5)
+* `-m NUM_GAMES` set number of games (default is 1000)
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
