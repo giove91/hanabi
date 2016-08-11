@@ -26,6 +26,12 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         num_players = int(sys.argv[i+1])
     
+    if '-m' in sys.argv[1:]:
+        # read number of simulations
+        i = sys.argv.index('-m')
+        assert len(sys.argv) >= i+2
+        num_simulations = int(sys.argv[i+1])
+    
     
     results = []
 
