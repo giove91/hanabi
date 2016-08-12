@@ -41,15 +41,15 @@ if __name__ == "__main__":
         game = Game(
                 num_players=num_players,
                 ai=ai,
-                wait_key=False,
-                log=False,
                 strategy_log=False,
                 dump_deck_to=None,
                 load_deck_from=None,
             )
         
         game.setup()
-        statistics = game.run_game()
+        for current_player, turn in game.run_game():
+            pass
+        statistics = game.statistics
         results.append(statistics)
     print
 

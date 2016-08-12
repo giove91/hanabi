@@ -14,6 +14,7 @@ if __name__ == "__main__":
     dump_deck_to = "deck.txt"
     load_deck_from = None
     short_log = False
+    interactive = False
     
     repeat = None  # repeat until a bad result is reached
     
@@ -57,6 +58,11 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         repeat = int(sys.argv[i+1])
     
+    if '-i' in sys.argv[1:]:
+        # run in interactive mode
+        interactive = True
+    
+    
     counter = 0
     while True:
         # run game
@@ -65,21 +71,57 @@ if __name__ == "__main__":
         game = Game(
                 num_players=num_players,
                 ai=ai,
-                wait_key=wait_key,
-                log=log,
                 strategy_log=strategy_log,
                 dump_deck_to=dump_deck_to,
                 load_deck_from=load_deck_from,
-                short_log=short_log,
             )
 
         game.setup()
         
-        if not short_log:
-            game.log_deck()
-        statistics = game.run_game()
         
-        print statistics
+        if interactive:
+            # run in interactive mode
+            from blessings import Terminal
+            
+            term = Terminal()
+            with term.fullscreen():
+                # print term.move_y(0)
+                with term.location(y=0):
+                    print term.bold("Hanabi game")
+                
+                with term.location(y=2):
+                    print "%d players   -   AI: %s" % (num_players, ai)
+                
+                raw_input()
+                
+                with term.location(y=4):
+                    statistics = game.run_game()
+        
+        else:
+            # non-interactive mode
+            if dump_deck_to is not None:
+                print "Dumping initial deck to %s" % dump_deck_to
+            
+            if not short_log:
+                game.log_deck()
+                game.log_status()
+            
+            # now run the game
+            for current_player, turn in game.run_game():
+                if wait_key:
+                    raw_input()
+                
+                if short_log:
+                    game.log_turn_short(turn, current_player)
+                    game.log_status_short()
+                else:
+                    game.log_turn(turn, current_player)
+                    game.log_status()
+            
+            statistics = game.statistics
+            print statistics
+        
+        
         counter += 1
         
         if repeat is None:
