@@ -10,6 +10,7 @@ Requirements
 ---------------------
 * Python 2.7
 * The `termcolor` Python module (install command: `pip install termcolor`)
+* The `blessings` Python module (install command: `pip install blessings`)
 
 Run a new game
 ---------------------
@@ -24,6 +25,7 @@ Run a new game
 * `-l FILENAME` load the initial deck from the given file (otherwise, by default, the initial deck is shuffled randomly)
 * `-d FILENAME` dump the initial deck to the given file (default is `deck.txt`)
 * `-r SCORE` run many games, until a score <= to the given score is reached
+* `-i` run in interactive mode
 
 
 
