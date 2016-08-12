@@ -10,7 +10,7 @@ from player import Player
 from action import Action
 
 
-Turn = namedtuple("Turn", "player action")
+Turn = namedtuple("Turn", "player action number")
 Statistics = namedtuple("Statistics", "score lives hints num_turns")
 
 
@@ -165,12 +165,12 @@ class Game:
         else:
             raise Exception("Unknown action type.")
         
-        return Turn(player, action), end_game
+        return Turn(player, action, self.get_current_turn()), end_game
     
     
     def log_turn(self, turn, player):
         action = turn.action
-        print "Turn %d (player %d):" % (self.get_current_turn(), player.id),
+        print "Turn %d (player %d):" % (turn.number, player.id),
         if action.type in [Action.PLAY, Action.DISCARD]:
             print action.type, self.discard_pile[-1], "(card %d)," % action.card_pos,
             print "draw %r" % player.hand[action.card_pos]

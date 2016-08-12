@@ -83,19 +83,67 @@ if __name__ == "__main__":
             # run in interactive mode
             from blessings import Terminal
             
-            term = Terminal()
-            with term.fullscreen():
-                # print term.move_y(0)
+            def print_all(term, num_players, ai, turn=None, current_player=None, statistics=None):
+                """
+                This function prints everything on the screen, from scratch.
+                """
+                CURSOR_Y = term.height - 3
+                
+                # clear everything
+                print term.clear()
+                
+                # move cursor
+                print term.move_y(CURSOR_Y)
+                
                 with term.location(y=0):
                     print term.bold("Hanabi game")
                 
                 with term.location(y=2):
-                    print "%d players   -   AI: %s" % (num_players, ai)
+                    print "Number of players: %d" % num_players
+                    print "AI: %s" % ai
                 
-                raw_input()
+                if turn is not None:
+                    # log turn
+                    with term.location(y=5):
+                        game.log_turn(turn, current_player)
+                    
+                    # log status
+                    with term.location(y=7):
+                        game.log_status()
                 
-                with term.location(y=4):
-                    statistics = game.run_game()
+                if statistics is not None:
+                    # game ended
+                    with term.location(y=7+10):
+                        print term.bold("Game ended")
+                        print statistics
+            
+            
+            term = Terminal()
+            with term.fullscreen():
+                print_all(term, num_players, ai)
+                
+                for current_player, turn in game.run_game():
+                    if wait_key:
+                        cmd = raw_input(":")
+                        if cmd in ["c", "continue"]:
+                            wait_key = False
+                    
+                    print_all(term, num_players, ai, turn=turn, current_player=current_player)
+                
+                statistics = game.statistics
+                print_all(term, num_players, ai, turn=turn, current_player=current_player, statistics=statistics)
+                
+                while True:
+                    cmd = raw_input(":")
+                    print_all(term, num_players, ai, turn=turn, current_player=current_player, statistics=statistics)
+                    
+                    if cmd in ["q", "quit"]:
+                        break
+                    
+                    else:
+                        with term.location(y = term.height - 4):
+                            print "Unknown command \"%s\"" % cmd
+        
         
         else:
             # non-interactive mode
