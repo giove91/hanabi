@@ -83,9 +83,9 @@ if __name__ == "__main__":
             # run in interactive mode
             from blessings import Terminal
             
-            def print_all(term, num_players, ai, turn=None, current_player=None, statistics=None):
+            def print_main(term, num_players, ai, short_log, turn=None, current_player=None, statistics=None):
                 """
-                This function prints everything on the screen, from scratch.
+                Print main view.
                 """
                 CURSOR_Y = term.height - 3
                 
@@ -105,11 +105,17 @@ if __name__ == "__main__":
                 if turn is not None:
                     # log turn
                     with term.location(y=5):
-                        game.log_turn(turn, current_player)
+                        if short_log:
+                            game.log_turn_short(turn, current_player)
+                        else:
+                            game.log_turn(turn, current_player)
                     
                     # log status
                     with term.location(y=7):
-                        game.log_status()
+                        if short_log:
+                            game.log_status_short()
+                        else:
+                            game.log_status()
                 
                 if statistics is not None:
                     # game ended
@@ -120,7 +126,7 @@ if __name__ == "__main__":
             
             term = Terminal()
             with term.fullscreen():
-                print_all(term, num_players, ai)
+                print_main(term, num_players, ai, short_log)
                 
                 for current_player, turn in game.run_game():
                     if wait_key:
@@ -128,14 +134,14 @@ if __name__ == "__main__":
                         if cmd in ["c", "continue"]:
                             wait_key = False
                     
-                    print_all(term, num_players, ai, turn=turn, current_player=current_player)
+                    print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player)
                 
                 statistics = game.statistics
-                print_all(term, num_players, ai, turn=turn, current_player=current_player, statistics=statistics)
+                print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player, statistics=statistics)
                 
                 while True:
                     cmd = raw_input(":")
-                    print_all(term, num_players, ai, turn=turn, current_player=current_player, statistics=statistics)
+                    print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player, statistics=statistics)
                     
                     if cmd in ["q", "quit"]:
                         break
