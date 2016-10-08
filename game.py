@@ -21,9 +21,10 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, ai="alphahanabi", strategy_log=False, dump_deck_to=None, load_deck_from=None):
+    def __init__(self, num_players, ai="alphahanabi", ai_params={}, strategy_log=False, dump_deck_to=None, load_deck_from=None):
         self.num_players = num_players
         self.ai = ai
+        self.ai_params = ai_params
         
         self.strategy_log = strategy_log    # log messages from strategy to standard output
         self.dump_deck_to = dump_deck_to    # if not None, dump the initial deck to the given file
@@ -56,6 +57,7 @@ class Game:
                 game = self,
                 hand = [self.draw_card_from_deck() for i in xrange(self.k)],
                 ai = self.ai,
+                ai_params = self.ai_params,
                 strategy_log = self.strategy_log
             ) for i in xrange(self.num_players)]
         

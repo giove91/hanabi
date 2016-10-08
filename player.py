@@ -8,7 +8,7 @@ from action import Action
 
 
 class Player:
-    def __init__(self, id, game, hand, ai, strategy_log=False):
+    def __init__(self, id, game, hand, ai, ai_params, strategy_log=False):
         # my id (order of play)
         self.id = id
         
@@ -18,13 +18,14 @@ class Player:
         # initial hand of cards
         self.hand = hand
         
-        # AI to be used
+        # AI to be used, with parameters
         self.ai = ai
+        self.ai_params = ai_params
         
         # create strategy object
         sys.path.append(self.ai)
         from strategy import Strategy
-        self.strategy = Strategy(verbose=strategy_log)
+        self.strategy = Strategy(verbose=strategy_log, params=ai_params)
     
     
     def __eq__(self, other):

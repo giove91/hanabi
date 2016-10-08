@@ -7,7 +7,7 @@ class BaseStrategy(object):
     Subclass this class once for each AI.
     """
     
-    def __init__(self, verbose=False):
+    def __init__(self, verbose=False, params={}):
         self.verbose = verbose
     
     

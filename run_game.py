@@ -7,6 +7,7 @@ from game import Game
 if __name__ == "__main__":
     # default values
     ai = "alphahanabi"
+    ai_params = {}
     wait_key = True
     num_players = 5
     log = True
@@ -62,6 +63,11 @@ if __name__ == "__main__":
         # run in interactive mode
         interactive = True
     
+    if '-p' in sys.argv[1:]:
+        # set difficulty parameter
+        i = sys.argv.index('-p')
+        assert len(sys.argv) >= i+2
+        ai_params['difficulty'] = sys.argv[i+1]
     
     counter = 0
     while True:
@@ -71,6 +77,7 @@ if __name__ == "__main__":
         game = Game(
                 num_players=num_players,
                 ai=ai,
+                ai_params=ai_params,
                 strategy_log=strategy_log,
                 dump_deck_to=dump_deck_to,
                 load_deck_from=load_deck_from,

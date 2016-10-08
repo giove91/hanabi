@@ -80,7 +80,19 @@ class HintsScheduler:
         """
         Select the suitable hints manager to be used this time.
         """
-        return self.card_hints_manager
+        # TODO: should check usability via hints_manager.is_usable()?
+        if self.strategy.difficulty == self.strategy.MODERATE:
+            return self.value_hints_manager
+        elif self.strategy.difficulty == self.strategy.HARD:
+            if self.playability_hints_manager.is_usable(player_id):
+                return self.playability_hints_manager
+            else:
+                return self.value_hints_manager
+        elif self.strategy.difficulty == self.strategy.HARDEST:
+            return self.card_hints_manager
+        else:
+            raise NotImplementedError()
+        
         """
         if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):
             return self.playability_hints_manager
@@ -100,9 +112,23 @@ class Strategy(BaseStrategy):
         5: 4,
     }   # k (number of cards per hand): size of the deck when we want to consider all combinations of cards
     
-    def __init__(self, verbose=False):
+    MODERATE = 'moderate'
+    HARD = 'hard'
+    HARDEST = 'hardest'
+    
+    DIFFICULTY_LEVELS = [MODERATE, HARD, HARDEST]
+    
+    def __init__(self, verbose=False, params={}):
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
         self.verbose = verbose
+        self.params = params
+        
+        if 'difficulty' in self.params:
+            self.difficulty = self.params['difficulty']
+            assert self.difficulty in self.DIFFICULTY_LEVELS
+        else:
+            # set default difficulty level
+            self.difficulty = self.HARDEST
     
     
     def initialize(self, id, num_players, k, hands, board, discard_pile):
