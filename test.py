@@ -10,6 +10,7 @@ from game import Game
 if __name__ == "__main__":
     # default values
     ai = "alphahanabi"
+    ai_params = {}
     num_players = 5
     num_simulations = 1000
     
@@ -32,6 +33,11 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         num_simulations = int(sys.argv[i+1])
     
+    if '-p' in sys.argv[1:]:
+        # set difficulty parameter
+        i = sys.argv.index('-p')
+        assert len(sys.argv) >= i+2
+        ai_params['difficulty'] = sys.argv[i+1]
     
     results = []
 
@@ -41,6 +47,7 @@ if __name__ == "__main__":
         game = Game(
                 num_players=num_players,
                 ai=ai,
+                ai_params=ai_params,
                 strategy_log=False,
                 dump_deck_to=None,
                 load_deck_from=None,
