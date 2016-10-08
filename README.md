@@ -19,6 +19,7 @@ Run a new game
 **Command line options**
 * `-n NUM_PLAYERS` set number of players (default is 5)
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
+* `-p DIFFICULTY` choose difficulty level for `alphahanabi` (possible values: `moderate`, `hard`, `hardest`; default is `hardest`)
 * `-c` run the game without pausing (otherwise, by default, each new turn is played by pressing ENTER)
 * `-s` activate the strategy log
 * `-t` print a shorter log of turns and status
@@ -39,3 +40,5 @@ or (much faster)`pypy test.py`
 * `-n NUM_PLAYERS` set number of players (default is 5)
 * `-m NUM_GAMES` set number of games (default is 1000)
 * `-a AI_DIRECTORY` choose AI (default is `alphahanabi`)
+* `-p DIFFICULTY` choose difficulty level for `alphahanabi` (possible values: `moderate`, `hard`, `hardest`; default is `hardest`)
+
