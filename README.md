@@ -3,7 +3,7 @@ Hanabi
 
 This is a program that plays [Hanabi](https://boardgamegeek.com/boardgame/98778/hanabi).
 
-The main AI is contained in the directory `alphahanabi`. It currently plays well only the 5-player games.
+The main AI is contained in the directory `alphahanabi`. It currently plays well 4 and 5-player games.
 A sample (stupid) AI is provided in the directory `dummy`.
 
 Requirements
