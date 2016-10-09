@@ -82,7 +82,7 @@ class HintAction(Action):
     
     
     def __repr__(self):
-        return "Play card %d" % self.card_pos
+        return "Hint to player %d about %r" % (self.player_id, self.value)
     
     def apply(self, game):
         # populate other fields, using information from the game

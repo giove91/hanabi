@@ -23,15 +23,16 @@ for (i, score) in SCORES.iteritems():
     game = Game(
             num_players=5,
             ai="alphahanabi",
-            wait_key=False,
-            log=False,
+            ai_params={"difficulty": "moderate"},
             strategy_log=False,
             dump_deck_to=None,
             load_deck_from="challenge-2016-07-21/game%d.txt" % i,
         )
     
     game.setup()
-    statistics = game.run_game()
+    for _ in game.run_game():
+        pass
+    statistics = game.statistics
     
     diff = statistics.score - score
     difference += diff

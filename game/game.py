@@ -223,25 +223,22 @@ class Game:
         """
         Dump the initial deck to file.
         """
-        file = open(filename, "w")
-        
-        # dump deck
-        for card in self.deck:
-            print >> file, "%d %s %d" % (card.number, card.color, card.id)
+        with open(filename, "w") as file:
+            # dump deck
+            for card in self.deck:
+                print >> file, "%d %s %d" % (card.number, card.color, card.id)
     
     
     def load_deck(self, filename):
         """
         Load the initial deck from file.
         """
-        if self.log:
-            print "Loading initial deck from %s" % filename
-        file = open(filename, "r")
-        
-        self.deck = []
-        for line in file:
-            number, color, id = line.split()
-            self.deck.append(Card(id=int(id), color=color, number=int(number)))
+        # print "Loading initial deck from %s" % filename
+        with open(filename, "r") as file:
+            self.deck = []
+            for line in file:
+                number, color, id = line.split()
+                self.deck.append(Card(id=int(id), color=color, number=int(number)))
 
     
     def run_game(self):
