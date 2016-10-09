@@ -8,8 +8,8 @@ import copy
 sys.path.append("..") 
 
 
-from action import Action, PlayAction, DiscardAction, HintAction
-from card import Card
+from game.action import Action, PlayAction, DiscardAction, HintAction
+from game.card import Card
 
 
 class BaseHintsManager(object):

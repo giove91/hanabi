@@ -1,6 +1,6 @@
 import sys
 
-from game import Game
+from game.game import Game
 
 # TODO: aggiungere opzione -h (help)
 

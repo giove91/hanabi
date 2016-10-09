@@ -4,12 +4,12 @@
 import sys
 import random
 
-sys.path.append("..") 
+sys.path.append("..")
 
 
-from action import Action, PlayAction, DiscardAction, HintAction
-from card import Card, deck
-from base_strategy import BaseStrategy
+from game.action import Action, PlayAction, DiscardAction, HintAction
+from game.card import Card, deck
+from game.base_strategy import BaseStrategy
 
 
 class Strategy(BaseStrategy):

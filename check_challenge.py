@@ -8,7 +8,7 @@ Ideally, it should be part of some test suite (maybe).
 
 import sys
 
-from game import Game
+from game.game import Game
 
 SCORES = {
     0: 27,
