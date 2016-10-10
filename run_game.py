@@ -94,7 +94,7 @@ if __name__ == "__main__":
             # run in interactive mode
             from blessings import Terminal
             
-            def print_main(term, num_players, ai, short_log, turn=None, current_player=None, statistics=None):
+            def print_main(term, num_players, ai, ai_params, short_log, turn=None, current_player=None, statistics=None):
                 """
                 Print main view.
                 """
@@ -112,17 +112,21 @@ if __name__ == "__main__":
                 with term.location(y=2):
                     print "Number of players: %d" % num_players
                     print "AI: %s" % ai
+                    if "difficulty" in ai_params:
+                        print "Difficulty: %s" % ai_params["difficulty"]
+                    if load_deck_from is not None:
+                        print "Deck file: %s" % load_deck_from
                 
                 if turn is not None:
                     # log turn
-                    with term.location(y=5):
+                    with term.location(y=7):
                         if short_log:
                             game.log_turn_short(turn, current_player)
                         else:
                             game.log_turn(turn, current_player)
                     
                     # log status
-                    with term.location(y=7):
+                    with term.location(y=9):
                         if short_log:
                             game.log_status_short()
                         else:
@@ -130,14 +134,14 @@ if __name__ == "__main__":
                 
                 if statistics is not None:
                     # game ended
-                    with term.location(y=7+10):
+                    with term.location(y=9+10):
                         print term.bold("Game ended")
                         print statistics
             
             
             term = Terminal()
             with term.fullscreen():
-                print_main(term, num_players, ai, short_log)
+                print_main(term, num_players, ai, ai_params, short_log)
                 
                 for current_player, turn in game.run_game():
                     if wait_key:
@@ -145,22 +149,23 @@ if __name__ == "__main__":
                         if cmd in ["c", "continue"]:
                             wait_key = False
                     
-                    print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player)
+                    print_main(term, num_players, ai, ai_params, short_log, turn=turn, current_player=current_player)
                     
                 
                 statistics = game.statistics
-                print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player, statistics=statistics)
+                print_main(term, num_players, ai, ai_params, short_log, turn=turn, current_player=current_player, statistics=statistics)
                 
                 while True:
                     cmd = raw_input(":")
-                    print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player, statistics=statistics)
+                    print_main(term, num_players, ai, ai_params, short_log, turn=turn, current_player=current_player, statistics=statistics)
                     
                     if cmd in ["q", "quit"]:
                         break
                     
                     else:
                         with term.location(y = term.height - 4):
-                            print "Unknown command \"%s\"" % cmd
+                            # print "Unknown command \"%s\"" % cmd
+                            pass
         
         
         else:
