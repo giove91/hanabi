@@ -16,6 +16,7 @@ if __name__ == "__main__":
     load_deck_from = None
     short_log = False
     interactive = False
+    quit_immediately = False
     
     repeat = None  # repeat until a bad result is reached
     
@@ -69,6 +70,10 @@ if __name__ == "__main__":
         assert len(sys.argv) >= i+2
         ai_params['difficulty'] = sys.argv[i+1]
     
+    if '-q' in sys.argv[1:]:
+        # quit immediately after showing the initial cards
+        quit_immediately = True
+    
     counter = 0
     while True:
         # run game
@@ -84,7 +89,6 @@ if __name__ == "__main__":
             )
 
         game.setup()
-        
         
         if interactive:
             # run in interactive mode
@@ -142,6 +146,7 @@ if __name__ == "__main__":
                             wait_key = False
                     
                     print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player)
+                    
                 
                 statistics = game.statistics
                 print_main(term, num_players, ai, short_log, turn=turn, current_player=current_player, statistics=statistics)
@@ -166,6 +171,9 @@ if __name__ == "__main__":
             if not short_log:
                 game.log_deck()
                 game.log_status()
+            
+            if quit_immediately:
+                break
             
             # now run the game
             for current_player, turn in game.run_game():
