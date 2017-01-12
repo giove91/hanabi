@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import sys, os
 from django.db import models
 from django.core.validators import RegexValidator
+from datetime import date
+from jsonfield import JSONField # https://github.com/bradjasper/django-jsonfield
 
 from hanabi.settings import BASE_DIR
 
@@ -11,16 +13,23 @@ import game, card
 
 
 class Team(models.Model):
-    HUMAN = 'H'
-    AI = 'A'
-    
-    TYPE_CHOICES = (
-        (HUMAN, 'Human'),
-        (AI, 'AI'),
-    )
-
     name = models.CharField(max_length=200)
-    type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=HUMAN)
+    
+    def __unicode__(self):
+        return u'%s' % self.name
+
+
+class AI(Team):
+    ai_name = models.CharField(max_length=200)
+    ai_params = JSONField(default=dict)
+    fixed_elo = models.FloatField(blank=True, null=True, default=None)
+
+
+class Player(models.Model):
+    name = models.CharField(max_length=200)
+    
+    def __unicode__(self):
+        return u'%s' % self.name
 
 
 class GameSetup(models.Model):
@@ -31,7 +40,7 @@ class GameSetup(models.Model):
     deck = models.CharField(
         max_length=1024,
         validators=[RegexValidator(regex=DECK_REGEX)]
-    )
+    )   # comma-separated list of cards
     
     num_players = models.PositiveIntegerField()
     
@@ -43,6 +52,14 @@ class GameSetup(models.Model):
 
 class Result(models.Model):
     deck = models.ForeignKey(GameSetup, on_delete=models.CASCADE)
-
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, blank=True, null=True, default=None)
+    players = models.ManyToManyField(Player)
+    date = models.DateField(default=date.today)
+    
+    score = models.PositiveIntegerField()
+    lives = models.PositiveIntegerField(blank=True, null=True)
+    hints = models.PositiveIntegerField(blank=True, null=True)
+    num_turns = models.PositiveIntegerField(blank=True, null=True)
+    
 
 
