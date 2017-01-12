@@ -16,10 +16,14 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 from django.views.generic.base import RedirectView
+from django.contrib.auth import views as auth_views
 
+from game import views
 
 urlpatterns = [
     url(r'^$', RedirectView.as_view(pattern_name='index', permanent=False)),
     url(r'^game/', include('game.urls')),
     url(r'^admin/', admin.site.urls),
+    url(r'^login/$', auth_views.login, name='login'),
+    url(r'^logout/$', views.logout_view, name='logout'),
 ]
