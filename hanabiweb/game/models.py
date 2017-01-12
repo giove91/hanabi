@@ -12,11 +12,21 @@ sys.path.append(os.path.join(BASE_DIR, '../game'))
 import game, card
 
 
-class Team(models.Model):
+class Entity(models.Model):
     name = models.CharField(max_length=200)
+    
+    num_games = models.PositiveIntegerField(default=0)
+    elo = models.FloatField(default=1200.0)
     
     def __unicode__(self):
         return u'%s' % self.name
+    
+    class Meta:
+        verbose_name_plural = 'entities'
+
+
+class Team(Entity):
+    pass
 
 
 class AI(Team):
@@ -25,11 +35,10 @@ class AI(Team):
     fixed_elo = models.FloatField(blank=True, null=True, default=None)
 
 
-class Player(models.Model):
-    name = models.CharField(max_length=200)
-    
-    def __unicode__(self):
-        return u'%s' % self.name
+class Player(Entity):
+    pass
+
+
 
 
 class GameSetup(models.Model):
@@ -51,7 +60,7 @@ class GameSetup(models.Model):
 
 
 class Result(models.Model):
-    deck = models.ForeignKey(GameSetup, on_delete=models.CASCADE)
+    game_setup = models.ForeignKey(GameSetup, on_delete=models.CASCADE)
     team = models.ForeignKey(Team, on_delete=models.CASCADE, blank=True, null=True, default=None)
     players = models.ManyToManyField(Player)
     date = models.DateField(default=date.today)
@@ -61,5 +70,11 @@ class Result(models.Model):
     hints = models.PositiveIntegerField(blank=True, null=True)
     num_turns = models.PositiveIntegerField(blank=True, null=True)
     
+
+class EloVariation(models.Model):
+    entity = models.ForeignKey(Entity)
+    result = models.ForeignKey(Result)
+    elo = models.FloatField()
+
 
 

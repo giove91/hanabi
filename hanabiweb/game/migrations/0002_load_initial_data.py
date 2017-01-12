@@ -15,6 +15,7 @@ def load(apps, schema_editor):
         name="AlphaHanabi (moderate)",
         ai_name="alphahanabi",
         ai_params={"difficulty": "moderate"},
+        elo=1500.0,
         fixed_elo=1500.0,
     )
     
@@ -42,7 +43,7 @@ def unload(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('game', '0007_remove_team_type'),
+        ('game', '0001_initial'),
     ]
 
     operations = [
