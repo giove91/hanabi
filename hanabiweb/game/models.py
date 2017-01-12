@@ -23,19 +23,26 @@ class Team(models.Model):
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=HUMAN)
 
 
-class Deck(models.Model):
+class GameSetup(models.Model):
     COLORS = card.Card.COLORS
     CARD_REGEX = r'\d+ (' + '|'.join(COLORS) + ') \d+'
     DECK_REGEX = '^' + CARD_REGEX + '(,' + CARD_REGEX + ')*$'
     
-    description = models.CharField(
+    deck = models.CharField(
         max_length=1024,
         validators=[RegexValidator(regex=DECK_REGEX)]
     )
+    
+    num_players = models.PositiveIntegerField()
+    
+    datetime = models.DateTimeField(auto_now_add=True)
+    
+    def __unicode__(self):
+        return u"%r" % self.datetime
 
 
-class Game(models.Model):
-    deck = models.ForeignKey(Deck, on_delete=models.CASCADE)
+class Result(models.Model):
+    deck = models.ForeignKey(GameSetup, on_delete=models.CASCADE)
 
 
 
