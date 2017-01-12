@@ -53,7 +53,7 @@ class GameSetup(models.Model):
     
     num_players = models.PositiveIntegerField()
     
-    datetime = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
     
     def __unicode__(self):
         return u"%r" % self.datetime
@@ -75,6 +75,12 @@ class EloVariation(models.Model):
     entity = models.ForeignKey(Entity)
     result = models.ForeignKey(Result)
     elo = models.FloatField()
+    
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('timestamp',)
+
 
 
 
