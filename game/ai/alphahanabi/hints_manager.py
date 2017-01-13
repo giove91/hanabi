@@ -5,11 +5,8 @@ import sys
 import itertools
 import copy
 
-sys.path.append("..") 
-
-
-from game.action import Action, PlayAction, DiscardAction, HintAction
-from game.card import Card
+from ...action import Action, PlayAction, DiscardAction, HintAction
+from ...card import Card
 
 
 class BaseHintsManager(object):

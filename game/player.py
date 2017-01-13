@@ -6,6 +6,8 @@ import sys
 from card import Card
 from action import Action
 
+import importlib
+
 
 class Player:
     def __init__(self, id, game, hand, ai, ai_params, strategy_log=False):
@@ -23,8 +25,8 @@ class Player:
         self.ai_params = ai_params
         
         # create strategy object
-        sys.path.append(self.ai)
-        from strategy import Strategy
+        Strategy = __import__('ai.%s.strategy' % self.ai, globals(), locals(), fromlist=['Strategy'], level=-1).Strategy
+        
         self.strategy = Strategy(verbose=strategy_log, params=ai_params)
     
     

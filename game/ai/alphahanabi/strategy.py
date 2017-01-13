@@ -5,13 +5,10 @@ import sys
 import itertools
 import copy
 
-sys.path.append("..") 
-
-
-from game.action import Action, PlayAction, DiscardAction, HintAction
-from game.card import Card, deck
-from game.base_strategy import BaseStrategy
-from hints_manager import ValueHintsManager, PlayabilityHintsManager, CardHintsManager
+from ...action import Action, PlayAction, DiscardAction, HintAction
+from ...card import Card, deck
+from ...base_strategy import BaseStrategy
+from .hints_manager import ValueHintsManager, PlayabilityHintsManager, CardHintsManager
 
 
 
