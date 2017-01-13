@@ -15,7 +15,7 @@ Statistics = namedtuple("Statistics", "score lives hints num_turns")
 
 
 class Game:
-    POSSIBLE_NUM_PLAYERS = [2, 3, 4, 5]
+    NUM_PLAYERS_CHOICES = [2, 3, 4, 5]
     CARDS_PER_PLAYER = {2: 5, 3: 5, 4: 4, 5: 4}
     INITIAL_HINTS = 8
     MAX_HINTS = 8
