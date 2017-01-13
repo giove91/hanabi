@@ -21,7 +21,7 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, ai="alphahanabi", ai_params={}, strategy_log=False, dump_deck_to=None, load_deck_from=None):
+    def __init__(self, num_players, ai="alphahanabi", ai_params={}, strategy_log=False, dump_deck_to=None, load_deck_from=None, deck_description=None):
         self.num_players = num_players
         self.ai = ai
         self.ai_params = ai_params
@@ -29,23 +29,30 @@ class Game:
         self.strategy_log = strategy_log    # log messages from strategy to standard output
         self.dump_deck_to = dump_deck_to    # if not None, dump the initial deck to the given file
         self.load_deck_from = load_deck_from    # if not None, load the initial deck from the given file
+        self.deck_description = deck_description    # if not None, use this initial deck
         
         # compute number of cards per player
         self.k = self.CARDS_PER_PLAYER[num_players]
     
     
     def setup(self):
-        if self.load_deck_from is None:
+        if self.load_deck_from is None and self.deck_description is None:
             # construct deck
             self.deck = deck()
             
             # shuffle deck
             random.shuffle(self.deck)
         
-        else:
+        elif self.load_deck_from is not None:
             # use given deck
             self.load_deck(self.load_deck_from)
             assert set(self.deck) == set(deck())
+        
+        elif self.deck_description is not None:
+            # use given deck
+            self.load_deck_description(self.deck_description)
+            assert set(self.deck) == set(deck())
+        
         
         if self.dump_deck_to is not None:
             # dump initial deck to file
@@ -229,6 +236,13 @@ class Game:
                 print >> file, "%d %s %d" % (card.number, card.color, card.id)
     
     
+    def get_deck_description(self):
+        """
+        Produce string description for the deck.
+        """
+        return ",".join("%d %s %d" % (card.number, card.color, card.id) for card in self.deck)
+    
+    
     def load_deck(self, filename):
         """
         Load the initial deck from file.
@@ -240,6 +254,16 @@ class Game:
                 number, color, id = line.split()
                 self.deck.append(Card(id=int(id), color=color, number=int(number)))
 
+    
+    def load_deck_description(self, deck_description):
+        """
+        Load the initial deck from string.
+        """
+        self.deck = []
+        for card in deck_description.split(","):
+            number, color, id = card.split()
+            self.deck.append(Card(id=int(id), color=color, number=int(number)))
+    
     
     def run_game(self):
         """
