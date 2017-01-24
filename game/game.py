@@ -12,7 +12,7 @@ from action import Action
 
 Turn = namedtuple("Turn", "player action number")
 Statistics = namedtuple("Statistics", "score lives hints num_turns")
-
+Status = namedtuple("Status", "deck hands score lives hints last_turn")
 
 class Game:
     NUM_PLAYERS_CHOICES = [2, 3, 4, 5]
@@ -97,6 +97,16 @@ class Game:
     
     def get_current_score(self):
         return sum(self.board.itervalues())
+    
+    def get_current_status(self):
+        return Status(
+            deck = self.deck,
+            hands = [player.hand for player in self.players],
+            score = self.get_current_score(),
+            lives = self.lives,
+            hints = self.hints,
+            last_turn = self.turns[-1] if len(self.turns) > 0 else None,
+        )
     
     def draw_card_from_deck(self, player=None):
         if len(self.deck) == 1:
