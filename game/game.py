@@ -4,6 +4,7 @@
 import sys
 import random
 from collections import namedtuple
+import copy
 
 from card import Card, deck
 from player import Player
@@ -12,7 +13,7 @@ from action import Action
 
 Turn = namedtuple("Turn", "player action number")
 Statistics = namedtuple("Statistics", "score lives hints num_turns")
-Status = namedtuple("Status", "deck hands score lives hints last_turn")
+Status = namedtuple("Status", "deck hands score lives hints previous_turn is_last_round last_turn")
 
 class Game:
     NUM_PLAYERS_CHOICES = [2, 3, 4, 5]
@@ -75,6 +76,7 @@ class Game:
         
         # turn log
         self.turns = []
+        self.this_turn = None   # the turn just played
         
         # construct board (cards in play), indicating the last played number for each color
         self.board = {color: 0 for color in Card.COLORS}
@@ -100,12 +102,14 @@ class Game:
     
     def get_current_status(self):
         return Status(
-            deck = self.deck,
-            hands = [player.hand for player in self.players],
+            deck = copy.copy(self.deck),
+            hands = [copy.copy(player.hand) for player in self.players],
             score = self.get_current_score(),
             lives = self.lives,
             hints = self.hints,
-            last_turn = self.turns[-1] if len(self.turns) > 0 else None,
+            previous_turn = self.this_turn,
+            is_last_round = self.last_round,
+            last_turn = self.last_turn,
         )
     
     def draw_card_from_deck(self, player=None):
@@ -287,6 +291,9 @@ class Game:
         while not end_game:
             # do turn
             turn, end_game = self.run_turn(current_player)
+            
+            # temporarily store this turn, for get_current_status()
+            self.this_turn = turn
             
             # yield current player and turn
             yield current_player, turn
