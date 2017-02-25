@@ -13,7 +13,7 @@ from action import Action
 
 Turn = namedtuple("Turn", "player action number")
 Statistics = namedtuple("Statistics", "score lives hints num_turns")
-Status = namedtuple("Status", "deck hands score lives hints previous_turn is_last_round last_turn")
+Status = namedtuple("Status", "deck hands score lives hints previous_turn is_last_round last_turn board")
 
 class Game:
     NUM_PLAYERS_CHOICES = [2, 3, 4, 5]
@@ -110,6 +110,7 @@ class Game:
             previous_turn = self.this_turn,
             is_last_round = self.last_round,
             last_turn = self.last_turn,
+            board = copy.copy(self.board),
         )
     
     def draw_card_from_deck(self, player=None):
