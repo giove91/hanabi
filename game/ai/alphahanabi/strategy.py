@@ -158,7 +158,7 @@ class Strategy(BaseStrategy):
     
     def visible_cards(self):
         """
-        Generators of all the cards visible by me.
+        Generator of all the cards visible by me.
         """
         for card in self.discard_pile:
             yield card
