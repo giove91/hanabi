@@ -27,7 +27,12 @@ class Knowledge:
         self.player_id = player_id
         self.hand = hand
         
+        # possibilities for each card
         self.possibilities = [set(self.strategy.full_deck) for j in xrange(self.strategy.k)]
+    
+    
+    def __repr__(self):
+        return "Knowledge of player %d (%s)" % (self.player_id, self.type)
     
     
     def reset(self, pos):
@@ -42,7 +47,7 @@ class Knowledge:
     
     def update(self):
         if self.type == self.PERSONAL:
-            visible_cards = self.strategy.visible_cards()
+            visible_cards = list(self.strategy.visible_cards())
         else:
             visible_cards = self.strategy.discard_pile
         
@@ -51,14 +56,45 @@ class Knowledge:
             assert len(p) > 0 or self.hand[j] is None
     
     
+    def update_with_hint(self, action):
+        """
+        Update using hint.
+        """
+        for (i, p) in enumerate(self.possibilities):
+            for card in self.strategy.full_deck:
+                if card in p and not card.matches_hint(action, i):
+                    # if self.strategy.id == 0:
+                    #     self.strategy.log("Removing card %r from position %d" % (card, i))
+                    p.remove(card)
+    
+    
     def update_possibilities(self, p, visible_cards):
         """
-        Update possibilities removing visible cards.
+        Update possibilities for a single card removing visible cards.
         """
         for card in visible_cards:
             if card in p:
                 p.remove(card)
     
+    
+    def get_unique_possibilities(self, p):
+        """
+        Return a list of unique cards.
+        """
+        res = []
+        for card in p:
+            if not any(c.equals(card) for c in res):
+                res.append(card)
+        return res
+    
+    def log(self):
+        SIZE = 8
+        self.strategy.log("%r" % self)
+        for (i, p) in enumerate(self.possibilities):
+            unique_p = self.get_unique_possibilities(p)
+            self.strategy.log("[Card %d] " % i + ", ".join("%r" % card for card in unique_p[:SIZE]) + (", ... (%d possibilities)" % len(unique_p) if len(unique_p) > SIZE else ""))
+        self.strategy.log("")
+
 
 class Strategy(BaseStrategy):
     """
@@ -119,7 +155,7 @@ class Strategy(BaseStrategy):
         """
         Receive information about a played turn.
         """
-        # FIXME (old)
+        
         if action.type in [Action.PLAY, Action.DISCARD]:
             # reset knowledge of the player
             self.public_knowledge[player_id].reset(action.card_pos)
@@ -131,14 +167,22 @@ class Strategy(BaseStrategy):
         
         elif action.type == Action.HINT:
             # someone gave a hint!
-            # TODO: process
-            pass
+            for kn in self.all_knowledge:
+                if kn.player_id == action.player_id:
+                    kn.update_with_hint(action)
         
         # update knowledge
         self.update_knowledge()
+        
+        if self.id == 0:
+            for kn in self.all_knowledge:
+                kn.log()
     
     
     def get_turn_action(self):
+        """
+        Decide action.
+        """
         
         if self.hints > 0 and random.randint(0,2) == 0:
             # give random hint to the next player
