@@ -77,7 +77,7 @@ for (date, stats) in SCORES.iteritems():
                 ai_params={"difficulty": DIFFICULTIES[j]},
                 strategy_log=False,
                 dump_deck_to=None,
-                load_deck_from="challenge-%s/game%d.txt" % (date, i),
+                load_deck_from="challenges/challenge-%s/game%d.txt" % (date, i),
             )
             
             game.setup()
