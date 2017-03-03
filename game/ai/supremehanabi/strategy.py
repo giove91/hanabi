@@ -83,12 +83,37 @@ class Knowledge:
                         del p[card]
     
     
-    def log(self):
-        SIZE = 8
-        self.strategy.log("%r" % self)
-        for (i, p) in enumerate(self.possibilities):
-            self.strategy.log("[Card %d] " % i + ", ".join("%r" % card for card in sorted(p.keys())[:SIZE]) + (", ... (%d possibilities)" % len(p) if len(p) > SIZE else ""))
-        self.strategy.log("")
+    def log(self, verbose=0):
+        if verbose >= 1:
+            SIZE = 8
+            self.strategy.log("%r" % self)
+            for (i, p) in enumerate(self.possibilities):
+                self.strategy.log("[Card %d] " % i + ", ".join("%r" % card for card in sorted(p.keys())[:SIZE]) + (", ... (%d possibilities)" % len(p) if len(p) > SIZE else ""))
+            self.strategy.log("")
+        
+        else:
+            self.strategy.log("%r: %r" % (self, [len(p) for p in self.possibilities]))
+    
+    
+    def playable_probability(self, card_pos):
+        """
+        Probability that a card is playable.
+        """
+        if self.hand[card_pos] is None:
+            return None
+        
+        p = self.possibilities[card_pos]
+        return float(sum(v for (card, v) in p.iteritems() if card.playable(self.strategy.board))) / sum(p.values())
+    
+    
+    def playable(self, card_pos):
+        """
+        Is this card surely playable?
+        """
+        if self.hand[card_pos] is None:
+            return None
+        
+        return all(card.playable(self.strategy.board) for card in self.possibilities[card_pos])
 
 
 
@@ -97,6 +122,7 @@ class Strategy(BaseStrategy):
     An instance of this class represents a player's strategy.
     It only has the knowledge of that player, and it must make decisions.
     """
+    TOLERANCE = 0.001
     
     def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
         """
@@ -150,6 +176,13 @@ class Strategy(BaseStrategy):
             res += Counter(hand)
         
         return res
+    
+    
+    def next_player_id(self):
+        return (self.id + 1) % self.num_players
+    
+    def other_players_id(self):
+        return [i for i in xrange(self.num_players) if i != self.id]
     
     
     def feed_turn(self, player_id, action):
@@ -212,5 +245,35 @@ class Strategy(BaseStrategy):
             self.log("discard some random card")
             return DiscardAction(card_pos)
 
+    
+    def get_turn_action(self):
+        """
+        Choose action for this turn.
+        """
+        # check for playable cards in my hand
+        for card_pos in xrange(self.k):
+            if self.personal_knowledge.playable(card_pos):
+                return PlayAction(card_pos=card_pos)
+        
+        if self.hints >= 1:
+            # give hint, looking for some unknown playable card
+            for player_id in self.other_players_id():
+                for (card_pos, card) in enumerate(self.hands[player_id]):
+                    if card is None:
+                        continue
+                    
+                    kn = self.public_knowledge[player_id]   # public knowledge of that player
+                    if card.playable(self.board) and not kn.playable(card_pos):
+                        if any(c.color != card.color for c in kn.possibilities[card_pos]):
+                            # hint on color
+                            return HintAction(player_id=player_id, color=card.color)
+                        else:
+                            # hint on number
+                            return HintAction(player_id=player_id, number=card.number)
+        
+        # discard card
+        for card_pos in xrange(self.k):
+            if self.my_hand[card_pos] is not None:
+                return DiscardAction(card_pos=card_pos)
 
 
