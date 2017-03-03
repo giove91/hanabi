@@ -63,7 +63,8 @@ class Player:
                 deck_type = self.game.deck_type,
                 my_hand = get_appearance(self.hand, hide=True),
                 hands = {i: get_appearance(player.hand) for (i, player) in self.other_players().iteritems()},
-                discard_pile = get_appearance(self.game.discard_pile)
+                discard_pile = get_appearance(self.game.discard_pile),
+                deck_size = len(self.game.deck)
             )
     
     def update_strategy(self):

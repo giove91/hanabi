@@ -123,7 +123,7 @@ class Strategy(BaseStrategy):
             self.difficulty = self.HARDEST
     
     
-    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile, deck_size):
         """
         To be called once before the beginning.
         """
@@ -143,6 +143,9 @@ class Strategy(BaseStrategy):
         
         # discard pile
         self.discard_pile = discard_pile
+        
+        # deck size
+        self.deck_size = deck_size
         
         # for each of my card, store its possibilities
         self.possibilities = [Counter(self.full_deck) for i in xrange(self.k)]

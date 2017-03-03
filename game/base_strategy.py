@@ -11,7 +11,7 @@ class BaseStrategy(object):
         self.verbose = verbose
     
     
-    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile, deck_size):
         """
         To be called once before the beginning.
         """
@@ -24,6 +24,7 @@ class BaseStrategy(object):
         self.my_hand = my_hand  # says in which positions there is actually a card
         self.hands = hands
         self.discard_pile = discard_pile
+        self.deck_size = deck_size
     
     
     def update(self, hints, lives, my_hand, hands, discard_pile, turn, last_turn, deck_size):

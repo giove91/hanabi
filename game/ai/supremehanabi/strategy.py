@@ -22,12 +22,11 @@ class Knowledge:
     
     TYPES = [PERSONAL, PUBLIC]
     
-    def __init__(self, strategy, type, player_id, hand):
+    def __init__(self, strategy, type, player_id):
         self.strategy = strategy
         assert type in self.TYPES
         self.type = type
         self.player_id = player_id
-        self.hand = hand
         
         # possibilities for each card
         self.possibilities = [Counter(self.strategy.full_deck) for j in xrange(self.strategy.k)]
@@ -37,12 +36,19 @@ class Knowledge:
         return "Knowledge of player %d (%s)" % (self.player_id, self.type)
     
     
+    def hand(self):
+        if self.player_id == self.strategy.id:
+            return self.strategy.my_hand
+        else:
+            return self.strategy.hands[self.player_id]
+    
+    
     def reset(self, pos):
         """
         Reset possibilities for the card in the given position.
         """
-        if self.hand[pos] is None:
-            self.possibilites[pos] = Counter()
+        if self.hand()[pos] is None:
+            self.possibilities[pos] = Counter()
         else:
             self.possibilities[pos] = Counter(self.strategy.full_deck)
     
@@ -51,36 +57,62 @@ class Knowledge:
         """
         Update using visible cards.
         """
+        visible_cards = None
+        possible_cards = None
+        
         if self.type == self.PERSONAL:
             visible_cards = self.strategy.visible_cards()
+        
         else:
-            visible_cards = Counter(self.strategy.discard_pile)
+            if self.strategy.deck_size > 0:
+                visible_cards = Counter(self.strategy.discard_pile)
+            
+            else:
+                # in the last round, cards of the players can be considered as publicly visible
+                if self.player_id == self.strategy.id:
+                    # my knowledge
+                    visible_cards = self.strategy.visible_cards()
+                
+                else:
+                    # knoledge of some other player
+                    possible_cards = Counter(self.strategy.hands[self.player_id])
+                    del possible_cards[None]
         
         for card_pos in xrange(self.strategy.k):
-            self.update_single_card(card_pos, visible_cards)
-            assert len(self.possibilities[card_pos]) > 0 or self.hand[card_pos] is None
+            self.update_single_card(card_pos, visible_cards=visible_cards, possible_cards=possible_cards)
+            assert len(self.possibilities[card_pos]) > 0 or self.hand()[card_pos] is None
     
     
     def update_with_hint(self, action):
         """
         Update using hint.
         """
-        for (i, p) in enumerate(self.possibilities):
-            self.possibilities[i] = Counter({card: v for (card, v) in p.iteritems() if card.matches_hint(action, i)})
+        for (card_pos, p) in enumerate(self.possibilities):
+            self.possibilities[card_pos] = Counter(
+                {card: v for (card, v) in p.iteritems() if card.matches_hint(action, card_pos)}
+            )
     
     
-    def update_single_card(self, card_pos, visible_cards):
+    def update_single_card(self, card_pos, visible_cards=None, possible_cards=None):
         """
-        Update possibilities for a single card removing visible cards.
+        Update possibilities for a single card, either:
+        - removing visible cards (if visible_card is not None)
+        - restricting to the Counter of the given possible cards (if possible_cards is not None).
         """
         p = self.possibilities[card_pos]
-        for card in visible_cards:
-            if card in p:
-                p[card] = self.strategy.full_deck_composition[card] - visible_cards[card]
-                
-                if p[card] == 0:
-                        # remove this card
-                        del p[card]
+        
+        if visible_cards is not None:
+            for card in visible_cards:
+                if card in p:
+                    p[card] = self.strategy.full_deck_composition[card] - visible_cards[card]
+                    
+                    if p[card] == 0:
+                            # remove this card
+                            del p[card]
+        
+        else:
+            assert possible_cards is not None
+            self.possibilities[card_pos] &= possible_cards
     
     
     def log(self, verbose=0):
@@ -99,7 +131,7 @@ class Knowledge:
         """
         Probability that a card is playable.
         """
-        if self.hand[card_pos] is None:
+        if self.hand()[card_pos] is None:
             return None
         
         p = self.possibilities[card_pos]
@@ -110,7 +142,7 @@ class Knowledge:
         """
         Is this card surely playable?
         """
-        if self.hand[card_pos] is None:
+        if self.hand()[card_pos] is None:
             return None
         
         return all(card.playable(self.strategy.board) for card in self.possibilities[card_pos])
@@ -124,7 +156,7 @@ class Strategy(BaseStrategy):
     """
     TOLERANCE = 0.001
     
-    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile, deck_size):
         """
         To be called once before the beginning.
         """
@@ -145,12 +177,14 @@ class Strategy(BaseStrategy):
         # discard pile
         self.discard_pile = discard_pile
         
+        # deck size
+        self.deck_size = deck_size
         
         # personal knowledge
-        self.personal_knowledge = Knowledge(self, Knowledge.PERSONAL, id, self.my_hand)
+        self.personal_knowledge = Knowledge(self, Knowledge.PERSONAL, id)
         
         # public knowledge
-        self.public_knowledge = [Knowledge(self, Knowledge.PUBLIC, i, hands[i] if i != id else self.my_hand) for i in xrange(num_players)]
+        self.public_knowledge = [Knowledge(self, Knowledge.PUBLIC, i) for i in xrange(num_players)]
         
         # all knowledge
         self.all_knowledge = self.public_knowledge + [self.personal_knowledge]
