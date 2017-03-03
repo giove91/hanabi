@@ -3,9 +3,11 @@
 
 import sys
 import random
+from collections import Counter
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
-from ...card import Card, deck
+from ...card import Card, get_appearance
+from ...deck import DECKS
 from ...base_strategy import BaseStrategy
 
 
@@ -28,7 +30,7 @@ class Knowledge:
         self.hand = hand
         
         # possibilities for each card
-        self.possibilities = [set(self.strategy.full_deck) for j in xrange(self.strategy.k)]
+        self.possibilities = [Counter(self.strategy.full_deck) for j in xrange(self.strategy.k)]
     
     
     def __repr__(self):
@@ -40,16 +42,16 @@ class Knowledge:
         Reset possibilities for the card in the given position.
         """
         if self.hand[pos] is None:
-            self.possibilites[pos] = set()
+            self.possibilites[pos] = Counter()
         else:
-            self.possibilities[pos] = set(self.strategy.full_deck)
+            self.possibilities[pos] = Counter(self.strategy.full_deck)
     
     
     def update(self):
         if self.type == self.PERSONAL:
-            visible_cards = list(self.strategy.visible_cards())
+            visible_cards = self.strategy.visible_cards()
         else:
-            visible_cards = self.strategy.discard_pile
+            visible_cards = Counter(self.strategy.discard_pile)
         
         for (j, p) in enumerate(self.possibilities):
             self.update_possibilities(p, visible_cards)
@@ -61,11 +63,7 @@ class Knowledge:
         Update using hint.
         """
         for (i, p) in enumerate(self.possibilities):
-            for card in self.strategy.full_deck:
-                if card in p and not card.matches_hint(action, i):
-                    # if self.strategy.id == 0:
-                    #     self.strategy.log("Removing card %r from position %d" % (card, i))
-                    p.remove(card)
+            self.possibilities[i] = Counter({card: v for (card, v) in p.iteritems() if card.matches_hint(action, i)})
     
     
     def update_possibilities(self, p, visible_cards):
@@ -74,26 +72,20 @@ class Knowledge:
         """
         for card in visible_cards:
             if card in p:
-                p.remove(card)
+                p[card] = self.strategy.full_deck_composition[card] - visible_cards[card]
+                
+                if p[card] == 0:
+                        # remove this card
+                        del p[card]
     
-    
-    def get_unique_possibilities(self, p):
-        """
-        Return a list of unique cards.
-        """
-        res = []
-        for card in p:
-            if not any(c.equals(card) for c in res):
-                res.append(card)
-        return res
     
     def log(self):
         SIZE = 8
         self.strategy.log("%r" % self)
         for (i, p) in enumerate(self.possibilities):
-            unique_p = self.get_unique_possibilities(p)
-            self.strategy.log("[Card %d] " % i + ", ".join("%r" % card for card in unique_p[:SIZE]) + (", ... (%d possibilities)" % len(unique_p) if len(unique_p) > SIZE else ""))
+            self.strategy.log("[Card %d] " % i + ", ".join("%r" % card for card in sorted(p.keys())[:SIZE]) + (", ... (%d possibilities)" % len(p) if len(p) > SIZE else ""))
         self.strategy.log("")
+
 
 
 class Strategy(BaseStrategy):
@@ -102,20 +94,27 @@ class Strategy(BaseStrategy):
     It only has the knowledge of that player, and it must make decisions.
     """
     
-    def initialize(self, id, num_players, k, hands, board, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
         """
         To be called once before the beginning.
         """
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
-        self.my_hand = [None] * k   # says in which positions there is actually a card
-        self.hands = hands  # hands of other players
         self.board = board
-        self.discard_pile = discard_pile
+        self.deck_type = deck_type
         
         # store a copy of the full deck
-        self.full_deck = deck()
+        self.full_deck = get_appearance(DECKS[deck_type]())
+        self.full_deck_composition = Counter(self.full_deck)
+        
+        # hands
+        self.my_hand = my_hand  # says in which positions there is actually a card
+        self.hands = hands
+        
+        # discard pile
+        self.discard_pile = discard_pile
+        
         
         # personal knowledge
         self.personal_knowledge = Knowledge(self, Knowledge.PERSONAL, id, self.my_hand)
@@ -140,15 +139,13 @@ class Strategy(BaseStrategy):
 
     def visible_cards(self):
         """
-        Generator of all the cards visible by me.
+        Counter of all the cards visible by me.
         """
-        for card in self.discard_pile:
-            yield card
-        
+        res = Counter(self.discard_pile)
         for hand in self.hands.itervalues():
-            for card in hand:
-                yield card
-    
+            res += Counter(hand)
+        
+        return res
     
     
     def feed_turn(self, player_id, action):

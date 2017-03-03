@@ -6,7 +6,12 @@ import sys
 from action import Action
 
 
-class Card:
+
+class CardAppearance:
+    """
+    A card as seen by a player.
+    It only has color and number, but not the id.
+    """
     RED = 'Red'
     BLUE = 'Blue'
     WHITE = 'White'
@@ -19,21 +24,22 @@ class Card:
     
     COLORS = [RED, BLUE, WHITE, YELLOW, GREEN, RAINBOW]
     
+    COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(COLORS)}
+    
     PRINTABLE_COLORS = {
-            RED: 'red',
-            BLUE: 'blue',
-            WHITE: 'grey',
-            YELLOW: 'yellow',
-            GREEN: 'green',
-            RAINBOW: 'magenta'
-        }
+        RED: 'red',
+        BLUE: 'blue',
+        WHITE: 'grey',
+        YELLOW: 'yellow',
+        GREEN: 'green',
+        RAINBOW: 'magenta'
+    }
     
     
-    def __init__(self, id, color, number):
+    def __init__(self, color, number):
         assert color in self.COLORS
         assert 1 <= number <= self.NUM_NUMBERS
         
-        self.id = id
         self.color = color
         self.number = number
     
@@ -41,22 +47,22 @@ class Card:
     def __repr__(self):
         from termcolor import colored
         return colored("%d %s" % (self.number, self.color), self.PRINTABLE_COLORS[self.color])
-        # return colored("%d" % self.number, self.PRINTABLE_COLORS[self.color])
-
     
     def __hash__(self):
-        return self.id
-
+        return self.COLORS_TO_NUMBERS[self.color] + self.NUM_COLORS * self.number
     
     def __eq__(self, other):
-        return self.id == other.id
-
+        # same color and number
+        return self.color == other.color and self.number == other.number
 
     def __ne__(self, other):
         return self != other
     
+    
     def equals(self, other):
         # same color and number (but possibly different id)
+        # (this method is inherited by Card, but it exists here
+        # so that it can be used both by CardAppearance and Card)
         return self.color == other.color and self.number == other.number
     
     
@@ -80,13 +86,17 @@ class Card:
         # is this card playable on the board?
         return self.number == board[self.color] + 1
     
+    
+    
     def useful(self, board, full_deck, discard_pile):
+        # TODO make more efficient
+        
         # is this card still useful?
         
         # check that lower cards still exist
         for number in xrange(board[self.color] + 1, self.number):
-            copies_in_deck = sum(1 for card in full_deck if card.equals(Card(id=-1, color=self.color, number=number)))
-            copies_in_discard_pile = sum(1 for card in discard_pile if card.equals(Card(id=-1, color=self.color, number=number)))
+            copies_in_deck = sum(1 for card in full_deck if card.equals(CardAppearance(color=self.color, number=number)))
+            copies_in_discard_pile = sum(1 for card in discard_pile if card.equals(CardAppearance(color=self.color, number=number)))
             
             if copies_in_deck == copies_in_discard_pile:
                 # some lower card was discarded!
@@ -94,37 +104,59 @@ class Card:
         
         return self.number > board[self.color]
     
+    
     def relevant(self, board, full_deck, discard_pile):
+        # TODO make more efficient
+        
         # is this card the last copy available?
         copies_in_deck = sum(1 for card in full_deck if self.equals(card))
         copies_in_discard_pile = sum(1 for card in discard_pile if self.equals(card))
-        
-        # this method should always be called on a card which is not discarded yet
-        assert copies_in_deck > copies_in_discard_pile
         
         return self.useful(board, full_deck, discard_pile) and copies_in_deck == copies_in_discard_pile + 1
 
 
 
-def deck():
-    deck = []
-    id = 0
-    for color in Card.COLORS:
-        for number in xrange(1, 6):
-            if color == Card.RAINBOW:
-                quantity = 1
-            elif number == 1:
-                quantity = 3
-            elif 2 <= number <= 4:
-                quantity = 2
-            elif number == 5:
-                quantity = 1
-            else:
-                raise Exception("Unknown card parameters.")
-            
-            for i in xrange(quantity):
-                deck.append(Card(id, color, number))
-                id += 1
+class Card(CardAppearance):
+    """
+    A real card, with id.
+    """
     
-    return deck
+    def __init__(self, id, color, number):
+        assert color in self.COLORS
+        assert 1 <= number <= self.NUM_NUMBERS
+        
+        self.id = id
+        self.color = color
+        self.number = number
+    
+    def __hash__(self):
+        return self.id
+    
+    def __eq__(self, other):
+        # same id
+        return self.id == other.id
+
+    def __ne__(self, other):
+        return self != other
+    
+    
+    def appearance(self):
+        """
+        Construct the corresponding CardAppearance (forget id).
+        """
+        return CardAppearance(self.color, self.number)
+
+
+
+def get_appearance(cards, hide=False):
+    """
+    Given a list of (possibly None) Card objects, return the list of CardAppearance objects.
+    If hide=True, then hide the card and put 0 instead (this is used by Player to hide cards).
+    """
+    if hide:
+        return [0 if card is not None else None for card in cards]
+    else:
+        return [card.appearance() if card is not None else None for card in cards]
+
+
 

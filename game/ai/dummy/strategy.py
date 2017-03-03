@@ -5,7 +5,7 @@ import sys
 import random
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
-from ...card import Card, deck
+from ...card import Card
 from ...base_strategy import BaseStrategy
 
 

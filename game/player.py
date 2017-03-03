@@ -3,13 +3,18 @@
 
 import sys
 
-from card import Card
+from card import Card, get_appearance
 from action import Action
 
 import importlib
 
 
 class Player:
+    """
+    A Player class works as a wrapper around the Strategy class of the corresponding player.
+    In particular, it has to take care of hiding information not known to the player.
+    """
+    
     def __init__(self, id, game, hand, ai, ai_params, strategy_log=False):
         # my id (order of play)
         self.id = id
@@ -47,20 +52,30 @@ class Player:
     
     
     def initialize_strategy(self):
+        """
+        To be called once before the beginning.
+        """
         self.strategy.initialize(
                 id = self.id,
                 num_players = self.game.num_players,
                 k = self.game.k,
-                hands = {i: player.hand for (i, player) in self.other_players().iteritems()},
                 board = self.game.board,
-                discard_pile = self.game.discard_pile
+                deck_type = self.game.deck_type,
+                my_hand = get_appearance(self.hand, hide=True),
+                hands = {i: get_appearance(player.hand) for (i, player) in self.other_players().iteritems()},
+                discard_pile = get_appearance(self.game.discard_pile)
             )
     
     def update_strategy(self):
+        """
+        To be called immediately after every turn.
+        """
         self.strategy.update(
                 hints = self.game.hints,
                 lives = self.game.lives,
-                my_hand = [0 if card is not None else None for (i, card) in enumerate(self.hand)],
+                my_hand = get_appearance(self.hand, hide=True),
+                hands = {i: get_appearance(player.hand) for (i, player) in self.other_players().iteritems()},
+                discard_pile = get_appearance(self.game.discard_pile),
                 turn = self.game.get_current_turn(),
                 last_turn = self.game.last_turn,
                 deck_size = len(self.game.deck)

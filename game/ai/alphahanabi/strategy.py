@@ -4,9 +4,11 @@
 import sys
 import itertools
 import copy
+from collections import Counter
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
-from ...card import Card, deck
+from ...card import Card, get_appearance
+from ...deck import DECKS
 from ...base_strategy import BaseStrategy
 from .hints_manager import ValueHintsManager, PlayabilityHintsManager, CardHintsManager
 
@@ -89,13 +91,6 @@ class HintsScheduler:
             return self.card_hints_manager
         else:
             raise NotImplementedError()
-        
-        """
-        if self.num_players == 5 and self.k == 4 and self.playability_hints_manager.is_usable(player_id):
-            return self.playability_hints_manager
-        else:
-            return self.value_hints_manager
-        """
 
 
 class Strategy(BaseStrategy):
@@ -128,23 +123,29 @@ class Strategy(BaseStrategy):
             self.difficulty = self.HARDEST
     
     
-    def initialize(self, id, num_players, k, hands, board, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
         """
         To be called once before the beginning.
         """
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
-        self.my_hand = [None] * k   # says in which positions there is actually a card
-        self.hands = hands  # hands of other players
         self.board = board
-        self.discard_pile = discard_pile
+        self.deck_type = deck_type
         
         # store a copy of the full deck
-        self.full_deck = deck()
+        self.full_deck = get_appearance(DECKS[deck_type]())
+        self.full_deck_composition = Counter(self.full_deck)
+        
+        # hands
+        self.my_hand = my_hand  # says in which positions there is actually a card
+        self.hands = hands
+        
+        # discard pile
+        self.discard_pile = discard_pile
         
         # for each of my card, store its possibilities
-        self.possibilities = [set(self.full_deck) for i in xrange(self.k)]
+        self.possibilities = [Counter(self.full_deck) for i in xrange(self.k)]
         
         # remove cards of other players from possibilities
         self.update_possibilities()
@@ -158,25 +159,32 @@ class Strategy(BaseStrategy):
     
     def visible_cards(self):
         """
-        Generator of all the cards visible by me.
+        Counter of all the cards visible by me.
         """
-        for card in self.discard_pile:
-            yield card
-        
+        res = Counter(self.discard_pile)
         for hand in self.hands.itervalues():
-            for card in hand:
-                yield card
+            res += Counter(hand)
+        
+        return res
     
     
     def update_possibilities(self):
         """
         Update possibilities removing visible cards.
         """
-        for card in self.visible_cards():
-            for p in self.possibilities:
+        visible_cards = self.visible_cards()
+        for p in self.possibilities:
+            for card in self.full_deck_composition:
                 if card in p:
-                    p.remove(card)
-        assert all(len(p) > 0 or self.my_hand[card_pos] is None for (card_pos, p) in enumerate(self.possibilities))
+                    # this card is still possible
+                    # update the number of possible occurrences
+                    p[card] = self.full_deck_composition[card] - visible_cards[card]
+                    
+                    if p[card] == 0:
+                        # remove this card
+                        del p[card]
+        
+        assert all(sum(p.values()) > 0 or self.my_hand[card_pos] is None for (card_pos, p) in enumerate(self.possibilities))    # check to have at least one possible card!
     
     
     def update_possibilities_with_combinations(self):
@@ -184,8 +192,9 @@ class Strategy(BaseStrategy):
         Update possibilities examining all combinations of my hand.
         Better to do it with only few cards remaining!
         """
-        possible_cards = set()
+        possible_cards = Counter()
         for p in self.possibilities:
+            assert all(x > 0 for x in p.values())
             possible_cards |= p
         
         new_possibilities = [set() for card_pos in xrange(self.k)]
@@ -194,7 +203,7 @@ class Strategy(BaseStrategy):
         assert num_cards <= self.k
         
         # cycle over all combinations
-        for comb in itertools.permutations(possible_cards, num_cards):
+        for comb in itertools.permutations(list(possible_cards.elements()), num_cards):
             # construct hand
             hand = copy.copy(self.my_hand)
             i = 0
@@ -204,7 +213,7 @@ class Strategy(BaseStrategy):
                     i += 1
             
             # check if this hand is possible
-            if all(card is None or card in self.possibilities[card_pos] for (card_pos, card) in enumerate(hand)):
+            if all(card is None or self.possibilities[card_pos][card] > 0 for (card_pos, card) in enumerate(hand)):
                 # this hand is possible
                 # self.log("possible hand %r" % hand)
                 
@@ -215,9 +224,11 @@ class Strategy(BaseStrategy):
         self.log("old possibilities %r" % [len(p) for p in self.possibilities])
         self.log("new possibilities %r" % [len(p) for p in new_possibilities])
         
-        # update possibilities (avoid direct assignment to mantain references)
+        # update possibilities
         for (card_pos, p) in enumerate(self.possibilities):
-            p &= new_possibilities[card_pos]
+            self.possibilities[card_pos] = p & Counter(new_possibilities[card_pos])
+        
+        self.update_possibilities() # set the right multiplicities
     
     
     def next_player_id(self):
@@ -252,7 +263,7 @@ class Strategy(BaseStrategy):
             
             if player_id == self.id:
                 # check for my new card
-                self.possibilities[action.card_pos] = set(self.full_deck) if self.my_hand[action.card_pos] is not None else set()
+                self.possibilities[action.card_pos] = Counter(self.full_deck) if self.my_hand[action.card_pos] is not None else Counter()
         
         elif action.type == Action.HINT:
             # someone gave a hint!
@@ -289,16 +300,16 @@ class Strategy(BaseStrategy):
         
         for (card_pos, p) in enumerate(self.possibilities):
             if len(p) > 0:
-                num_relevant = sum(1 for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
-                relevant_weight_sum = sum(WEIGHT[card.number] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                num_relevant = sum(p[card] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
+                relevant_weight_sum = sum(WEIGHT[card.number] * p[card] for card in p if card.relevant(self.board, self.full_deck, self.discard_pile))
                 
-                relevant_ratio = float(num_relevant) / len(p)
-                relevant_weight = float(relevant_weight_sum) / len(p)
+                relevant_ratio = float(num_relevant) / sum(p.values())
+                relevant_weight = float(relevant_weight_sum) / sum(p.values())
                 
-                num_useful = sum(1 for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
-                useful_weight_sum = sum(WEIGHT[card.number] for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
-                useful_ratio = float(num_useful) / len(p)
-                useful_weight = float(useful_weight_sum) / len(p)
+                num_useful = sum(p[card] for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
+                useful_weight_sum = sum(WEIGHT[card.number] * p[card] for card in p if card.useful(self.board, self.full_deck, self.discard_pile))
+                useful_ratio = float(num_useful) / sum(p.values())
+                useful_weight = float(useful_weight_sum) / sum(p.values())
                 
                 
                 if relevant_weight < best_relevant_weight - tolerance:
@@ -340,11 +351,12 @@ class Strategy(BaseStrategy):
                 for card in p:
                     fake_board = copy.copy(self.board)
                     fake_board[card.color] += 1
-                    num_playable.append(sum(1 for (player_id, hand) in self.hands.iteritems() for c in hand if c is not None and c.playable(fake_board)))
+                    for i in xrange(p[card]):
+                        num_playable.append(sum(1 for (player_id, hand) in self.hands.iteritems() for c in hand if c is not None and c.playable(fake_board)))
                 
                 avg_num_playable = float(sum(num_playable)) / len(num_playable)
                 
-                avg_weight = float(sum(WEIGHT[card.number] for card in p)) / len(p)
+                avg_weight = float(sum(WEIGHT[card.number] * p[card] for card in p)) / sum(p.values())
                 
                 if avg_num_playable > best_avg_num_playable + tolerance or avg_num_playable > best_avg_num_playable - tolerance and avg_weight > best_avg_weight:
                     self.log("update card to be played, pos %d, score %f, %f" % (card_pos, avg_num_playable, avg_weight))
@@ -367,7 +379,7 @@ class Strategy(BaseStrategy):
             if any(card.playable(self.board) for card in p):
                 # at least a card (among the possible ones in this position) is playable
                 
-                obtained_scores = []
+                obtained_scores = Counter()
                 
                 for card in p:
                     # simulate what happens if I play this card
@@ -398,9 +410,10 @@ class Strategy(BaseStrategy):
                         best_score = max(score, best_score) # assume that the other players play optimally! :)
                     
                     # self.log("simulation for card %r in position %d gives best score %d" % (card, card_pos, best_score))
-                    obtained_scores.append(best_score)
+                    # self.log("obtained possible score %d (multiplicity %d)" % (best_score, p[card]))
+                    obtained_scores[best_score] += p[card]
                 
-                avg_score = float(sum(obtained_scores)) / len(obtained_scores)
+                avg_score = float(sum(obtained_scores.elements())) / sum(obtained_scores.values())
                 self.log("playing card in position %d gives an average score of %.3f" % (card_pos, avg_score))
                 
                 if avg_score > best_avg_score:

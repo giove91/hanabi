@@ -6,9 +6,10 @@ import random
 from collections import namedtuple
 import copy
 
-from card import Card, deck
+from card import Card
 from player import Player
 from action import Action
+from deck import DECKS, DECK55, DECK50
 
 
 Turn = namedtuple("Turn", "player action number")
@@ -23,7 +24,7 @@ class Game:
     INITIAL_LIVES = 3
     
     
-    def __init__(self, num_players, ai="alphahanabi", ai_params={}, strategy_log=False, dump_deck_to=None, load_deck_from=None, deck_description=None):
+    def __init__(self, num_players, ai="alphahanabi", ai_params={}, strategy_log=False, dump_deck_to=None, load_deck_from=None, deck_description=None, deck_type=DECK55):
         self.num_players = num_players
         self.ai = ai
         self.ai_params = ai_params
@@ -32,6 +33,7 @@ class Game:
         self.dump_deck_to = dump_deck_to    # if not None, dump the initial deck to the given file
         self.load_deck_from = load_deck_from    # if not None, load the initial deck from the given file
         self.deck_description = deck_description    # if not None, use this initial deck
+        self.deck_type = deck_type  # type of deck (see deck.py)
         
         # compute number of cards per player
         self.k = self.CARDS_PER_PLAYER[num_players]
@@ -40,7 +42,7 @@ class Game:
     def setup(self):
         if self.load_deck_from is None and self.deck_description is None:
             # construct deck
-            self.deck = deck()
+            self.deck = DECKS[self.deck_type]()
             
             # shuffle deck
             random.shuffle(self.deck)
@@ -48,12 +50,12 @@ class Game:
         elif self.load_deck_from is not None:
             # use given deck
             self.load_deck(self.load_deck_from)
-            assert set(self.deck) == set(deck())
+            assert set(self.deck) == set(DECKS[self.deck_type]())
         
         elif self.deck_description is not None:
             # use given deck
             self.load_deck_description(self.deck_description)
-            assert set(self.deck) == set(deck())
+            assert set(self.deck) == set(DECKS[self.deck_type]())
         
         
         if self.dump_deck_to is not None:

@@ -11,20 +11,22 @@ class BaseStrategy(object):
         self.verbose = verbose
     
     
-    def initialize(self, id, num_players, k, hands, board, discard_pile):
+    def initialize(self, id, num_players, k, board, deck_type, my_hand, hands, discard_pile):
         """
         To be called once before the beginning.
         """
         self.id = id
         self.num_players = num_players
         self.k = k  # number of cards per hand
-        self.my_hand = [None] * k   # says in which positions there is actually a card
-        self.hands = hands  # hands of other players
         self.board = board
+        self.deck_type = deck_type
+        
+        self.my_hand = my_hand  # says in which positions there is actually a card
+        self.hands = hands
         self.discard_pile = discard_pile
     
     
-    def update(self, hints, lives, my_hand, turn, last_turn, deck_size):
+    def update(self, hints, lives, my_hand, hands, discard_pile, turn, last_turn, deck_size):
         """
         To be called immediately after every turn.
         """
@@ -34,9 +36,9 @@ class BaseStrategy(object):
         self.last_turn = last_turn
         self.deck_size = deck_size
         
-        # copy my_hand maintaining the reference
-        for card_pos in xrange(self.k):
-            self.my_hand[card_pos] = my_hand[card_pos]
+        self.my_hand = my_hand  # says in which positions there is actually a card
+        self.hands = hands
+        self.discard_pile = discard_pile
     
     
     def feed_turn(self, player_id, action):
