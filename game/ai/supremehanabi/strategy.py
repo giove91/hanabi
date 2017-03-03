@@ -48,14 +48,17 @@ class Knowledge:
     
     
     def update(self):
+        """
+        Update using visible cards.
+        """
         if self.type == self.PERSONAL:
             visible_cards = self.strategy.visible_cards()
         else:
             visible_cards = Counter(self.strategy.discard_pile)
         
-        for (j, p) in enumerate(self.possibilities):
-            self.update_possibilities(p, visible_cards)
-            assert len(p) > 0 or self.hand[j] is None
+        for card_pos in xrange(self.strategy.k):
+            self.update_single_card(card_pos, visible_cards)
+            assert len(self.possibilities[card_pos]) > 0 or self.hand[card_pos] is None
     
     
     def update_with_hint(self, action):
@@ -66,10 +69,11 @@ class Knowledge:
             self.possibilities[i] = Counter({card: v for (card, v) in p.iteritems() if card.matches_hint(action, i)})
     
     
-    def update_possibilities(self, p, visible_cards):
+    def update_single_card(self, card_pos, visible_cards):
         """
         Update possibilities for a single card removing visible cards.
         """
+        p = self.possibilities[card_pos]
         for card in visible_cards:
             if card in p:
                 p[card] = self.strategy.full_deck_composition[card] - visible_cards[card]
