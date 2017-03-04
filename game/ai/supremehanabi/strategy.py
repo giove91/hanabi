@@ -4,6 +4,8 @@
 import sys
 import random
 from collections import Counter
+from operator import mul
+import itertools
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
 from ...card import Card, get_appearance
@@ -22,6 +24,9 @@ class Knowledge:
     
     TYPES = [PERSONAL, PUBLIC]
     
+    # maximum number of combinations that can be considered
+    MAX_COMBINATIONS = 1000
+    
     def __init__(self, strategy, type, player_id):
         self.strategy = strategy
         assert type in self.TYPES
@@ -30,6 +35,9 @@ class Knowledge:
         
         # possibilities for each card
         self.possibilities = [Counter(self.strategy.full_deck) for j in xrange(self.strategy.k)]
+        
+        # combinations (initially not constructed)
+        self.combinations = None
     
     
     def __repr__(self):
@@ -46,6 +54,7 @@ class Knowledge:
     def reset(self, pos):
         """
         Reset possibilities for the card in the given position.
+        This method is called every time someone plays or discard a card.
         """
         if self.hand()[pos] is None:
             self.possibilities[pos] = Counter()
@@ -53,9 +62,9 @@ class Knowledge:
             self.possibilities[pos] = Counter(self.strategy.full_deck)
     
     
-    def update(self):
+    def get_possible_cards(self):
         """
-        Update using visible cards.
+        Get Counter of possible cards, based on visible cards.
         """
         visible_cards = None
         possible_cards = None
@@ -78,14 +87,28 @@ class Knowledge:
                     possible_cards = Counter(self.strategy.hands[self.player_id])
                     del possible_cards[None]
         
+        if possible_cards is None:
+            possible_cards = self.strategy.full_deck_composition - visible_cards
+        
+        return possible_cards
+    
+    
+    def update_with_visible_cards(self):
+        """
+        Update using visible cards.
+        This method is called every time someone plays or discard a card.
+        """
+        possible_cards = self.get_possible_cards()
+        
         for card_pos in xrange(self.strategy.k):
-            self.update_single_card(card_pos, visible_cards=visible_cards, possible_cards=possible_cards)
+            self.update_single_card(card_pos, possible_cards)
             assert len(self.possibilities[card_pos]) > 0 or self.hand()[card_pos] is None
     
     
     def update_with_hint(self, action):
         """
         Update using hint.
+        This method is called every time someone gives a hint.
         """
         for (card_pos, p) in enumerate(self.possibilities):
             self.possibilities[card_pos] = Counter(
@@ -93,26 +116,54 @@ class Knowledge:
             )
     
     
-    def update_single_card(self, card_pos, visible_cards=None, possible_cards=None):
+    def update_single_card(self, card_pos, possible_cards):
         """
-        Update possibilities for a single card, either:
-        - removing visible cards (if visible_card is not None)
-        - restricting to the Counter of the given possible cards (if possible_cards is not None).
+        Update possibilities for a single card, restricting to the Counter of the given possible cards.
         """
-        p = self.possibilities[card_pos]
+        self.possibilities[card_pos] &= possible_cards
+    
+    
+    def update(self):
+        """
+        This method is called once at the end of feed_turn, to normalize knowledge.
+        """
+        # possibly update combinations
+        self.update_combinations()
+    
+    
+    def update_combinations(self):
+        """
+        Create/update/delete storage of all possible combinations of the hand.
+        This method is called by update().
+        """
+        hand = self.hand()
+        num_combinations = reduce(mul, [len(p) for p in self.possibilities if len(p) > 0], 1)
         
-        if visible_cards is not None:
-            for card in visible_cards:
-                if card in p:
-                    p[card] = self.strategy.full_deck_composition[card] - visible_cards[card]
-                    
-                    if p[card] == 0:
-                            # remove this card
-                            del p[card]
+        if num_combinations <= self.MAX_COMBINATIONS:
+            # compute and store valid combinations
+            self.combinations = []
+            positions = [card_pos for card_pos in xrange(self.strategy.k) if hand[card_pos] is not None]
+            possible_cards = self.get_possible_cards()
+        
+            for combination in itertools.product(*[p for p in self.possibilities if len(p) > 0]):
+                # check that this combination is valid
+                if all(possible_cards[card] >= v for (card, v) in Counter(combination).iteritems()):
+                    self.combinations.append(combination)
+                
+            self.strategy.log("Found %d valid combinations out of %d." % (len(self.combinations), num_combinations))
+            
+            # update possibilities
+            for (i, card_pos) in enumerate(positions):
+                # print i, combination
+                possible_cards_here_set = set(combination[i] for combination in self.combinations)
+                possible_cards_here = Counter({card: possible_cards[card] for card in possible_cards_here_set})
+                # print possible_cards_here
+                self.update_single_card(card_pos, possible_cards_here)
         
         else:
-            assert possible_cards is not None
-            self.possibilities[card_pos] &= possible_cards
+            # delete stored data as it is outdated
+            self.combinations = None
+            self.weights = None
     
     
     def log(self, verbose=0):
@@ -231,6 +282,10 @@ class Strategy(BaseStrategy):
             if player_id == self.id:
                 # check for my new card
                 self.personal_knowledge.reset(action.card_pos)
+            
+            # new cards are visible
+            for kn in self.all_knowledge:
+                kn.update_with_visible_cards()
         
         
         elif action.type == Action.HINT:
