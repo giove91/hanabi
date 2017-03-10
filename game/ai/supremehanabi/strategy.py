@@ -25,7 +25,7 @@ class Knowledge:
     TYPES = [PERSONAL, PUBLIC]
     
     # maximum number of combinations that can be considered
-    MAX_COMBINATIONS = 1000
+    MAX_COMBINATIONS = 100
     
     def __init__(self, strategy, type, player_id):
         self.strategy = strategy
@@ -140,23 +140,25 @@ class Knowledge:
         num_combinations = reduce(mul, [len(p) for p in self.possibilities if len(p) > 0], 1)
         
         if num_combinations <= self.MAX_COMBINATIONS:
-            # compute and store valid combinations
-            self.combinations = []
+            # look for valid combinations
+            # self.combinations = []
             positions = [card_pos for card_pos in xrange(self.strategy.k) if hand[card_pos] is not None]
             possible_cards = self.get_possible_cards()
+            possible_cards_per_position = [set() for i in xrange(len(positions))]
         
             for combination in itertools.product(*[p for p in self.possibilities if len(p) > 0]):
                 # check that this combination is valid
                 if all(possible_cards[card] >= v for (card, v) in Counter(combination).iteritems()):
-                    self.combinations.append(combination)
-                
-            self.strategy.log("Found %d valid combinations out of %d." % (len(self.combinations), num_combinations))
+                    for (i, card) in enumerate(combination):
+                        possible_cards_per_position[i].add(card)
+                    # self.combinations.append(combination)
             
             # update possibilities
             for (i, card_pos) in enumerate(positions):
-                # print i, combination
-                possible_cards_here_set = set(combination[i] for combination in self.combinations)
-                possible_cards_here = Counter({card: possible_cards[card] for card in possible_cards_here_set})
+                # possible_cards_here_set = set(combination[i] for combination in self.combinations)
+                # possible_cards_here = Counter({card: possible_cards[card] for card in possible_cards_here_set})
+                possible_cards_here = Counter({card: possible_cards[card] for card in possible_cards_per_position[i]})
+                
                 # print possible_cards_here
                 self.update_single_card(card_pos, possible_cards_here)
         
@@ -301,39 +303,6 @@ class Strategy(BaseStrategy):
             for kn in self.all_knowledge:
                 kn.log()
     
-    
-    def get_turn_action(self):
-        """
-        Decide action.
-        """
-        
-        if self.hints > 0 and random.randint(0,2) == 0:
-            # give random hint to the next player
-            player_id = (self.id + 1) % self.num_players
-            card = random.choice([card for card in self.hands[player_id] if card is not None])
-            
-            if random.randint(0,1) == 0:
-                color = card.color
-                number = None
-            else:
-                color = None
-                number = card.number
-            
-            self.log("give some random hint")
-            return HintAction(player_id, color=color, number=number)
-        
-        elif random.randint(0,1) == 0:
-            # play random card
-            card_pos = random.choice([c_pos for (c_pos, value) in enumerate(self.my_hand) if value is not None])
-            self.log("play some random card")
-            return PlayAction(card_pos)
-        
-        else:
-            # discard random card
-            card_pos = random.choice([c_pos for (c_pos, value) in enumerate(self.my_hand) if value is not None])
-            self.log("discard some random card")
-            return DiscardAction(card_pos)
-
     
     def get_turn_action(self):
         """
