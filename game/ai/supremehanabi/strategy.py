@@ -13,6 +13,7 @@ from ...deck import DECKS
 from ...base_strategy import BaseStrategy
 
 from .knowledge import Knowledge
+from .hints_manager import HintsManager
 
 
 class Strategy(BaseStrategy):
