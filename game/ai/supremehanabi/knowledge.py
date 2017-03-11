@@ -5,6 +5,8 @@ from collections import Counter
 from operator import mul
 import itertools
 
+from constants import *
+
 
 class Knowledge:
     """
@@ -170,6 +172,39 @@ class Knowledge:
         
         else:
             self.strategy.log("%r: %r" % (self, [len(p) for p in self.possibilities]))
+    
+    
+    def overview(self):
+        """
+        For each card position, return the number of possible:
+        - useless cards;
+        - playable cards;
+        - relevant not playable cards;
+        - useful not playable not relevant cards.
+        """
+        res = [{
+                USELESS: 0,
+                PLAYABLE: 0,
+                RELEVANT: 0,
+                USEFUL: 0
+            } for i in xrange(self.strategy.k)]
+        
+        board = self.strategy.board
+        full_deck = self.strategy.full_deck_composition
+        discard_pile = self.strategy.discard_pile_composition
+        
+        for card_pos, p in enumerate(self.possibilities):
+            for card in p.iterkeys():
+                if not card.useful(board, full_deck, discard_pile):
+                    res[card_pos][USELESS] += 1
+                elif card.playable(board):
+                    res[card_pos][PLAYABLE] += 1
+                elif card.relevant(board, full_deck, discard_pile):
+                    res[card_pos][RELEVANT] += 1
+                else:
+                    res[card_pos][USEFUL] += 1
+        
+        return res
     
     
     def playable_probability(self, card_pos):

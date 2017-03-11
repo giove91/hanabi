@@ -43,6 +43,7 @@ class Strategy(BaseStrategy):
         
         # discard pile
         self.discard_pile = discard_pile
+        self.discard_pile_composition = Counter(discard_pile)
         
         # deck size
         self.deck_size = deck_size
@@ -58,6 +59,22 @@ class Strategy(BaseStrategy):
         
         # remove cards of other players from possibilities
         self.update_knowledge()
+    
+    
+    def update(self, hints, lives, my_hand, hands, discard_pile, turn, last_turn, deck_size):
+        """
+        To be called immediately after every turn.
+        """
+        self.hints = hints
+        self.lives = lives
+        self.turn = turn
+        self.last_turn = last_turn
+        self.deck_size = deck_size
+        
+        self.my_hand = my_hand  # says in which positions there is actually a card
+        self.hands = hands
+        self.discard_pile = discard_pile
+        self.discard_pile_composition = Counter(discard_pile)
     
     
     def update_knowledge(self):
