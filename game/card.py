@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from collections import Counter
 
 from action import Action
 
@@ -82,21 +83,39 @@ class CardAppearance:
         return card_pos in action.cards_pos and matches or card_pos not in action.cards_pos and not matches
     
     
+    def appearance(self):
+        """
+        This method is overloaded by Card.
+        """
+        return self
+    
+    """
+    The following methods are only used by AIs, not by Game.
+    """
+    
     def playable(self, board):
-        # is this card playable on the board?
+        """
+        Is this card playable on the board?
+        """
         return self.number == board[self.color] + 1
     
     
-    
     def useful(self, board, full_deck, discard_pile):
-        # TODO make more efficient
-        
-        # is this card still useful?
-        
+        """
+        Is this card still useful?
+        full_deck and discard_pile can be given either as lists or as Counters (more efficient).
+        """
         # check that lower cards still exist
         for number in xrange(board[self.color] + 1, self.number):
-            copies_in_deck = sum(1 for card in full_deck if card.equals(CardAppearance(color=self.color, number=number)))
-            copies_in_discard_pile = sum(1 for card in discard_pile if card.equals(CardAppearance(color=self.color, number=number)))
+            if isinstance(full_deck, Counter):
+                copies_in_deck = full_deck[CardAppearance(color=self.color, number=number)]
+            else:
+                copies_in_deck = sum(1 for card in full_deck if card.equals(CardAppearance(color=self.color, number=number)))
+            
+            if isinstance(discard_pile, Counter):
+                copies_in_discard_pile = discard_pile[CardAppearance(color=self.color, number=number)]
+            else:
+                copies_in_discard_pile = sum(1 for card in discard_pile if card.equals(CardAppearance(color=self.color, number=number)))
             
             if copies_in_deck == copies_in_discard_pile:
                 # some lower card was discarded!
@@ -106,11 +125,19 @@ class CardAppearance:
     
     
     def relevant(self, board, full_deck, discard_pile):
-        # TODO make more efficient
+        """
+        Is this card the last copy available?
+        full_deck and discard_pile can be given either as lists or as Counters (more efficient).
+        """
+        if isinstance(full_deck, Counter):
+            copies_in_deck = full_deck[self.appearance()]
+        else:
+            copies_in_deck = sum(1 for card in full_deck if self.equals(card))
         
-        # is this card the last copy available?
-        copies_in_deck = sum(1 for card in full_deck if self.equals(card))
-        copies_in_discard_pile = sum(1 for card in discard_pile if self.equals(card))
+        if isinstance(discard_pile, Counter):
+            copies_in_discard_pile = discard_pile[self.appearance()]
+        else:
+            copies_in_discard_pile = sum(1 for card in discard_pile if self.equals(card))
         
         return self.useful(board, full_deck, discard_pile) and copies_in_deck == copies_in_discard_pile + 1
 
