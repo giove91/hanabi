@@ -83,6 +83,13 @@ class CardAppearance:
         return card_pos in action.cards_pos and matches or card_pos not in action.cards_pos and not matches
     
     
+    def value(self, type):
+        if type == Action.COLOR:
+            return self.color
+        else:
+            return self.number
+    
+    
     def appearance(self):
         """
         This method is overloaded by Card.
