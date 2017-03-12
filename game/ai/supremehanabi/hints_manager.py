@@ -4,6 +4,7 @@
 import sys
 import itertools
 import copy
+from collections import Counter, OrderedDict
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
 from ...card import Card
@@ -52,6 +53,19 @@ class HintInformation:
         return self.primary, self.secondary == other.primary, other.secondary   # k is fixed during a game
     
 
+class Meaning(dict):
+    """
+    Dictionary of the form
+        {card_pos: set of possible cards in this position}.
+    Supports "or" operation.
+    """
+    
+    def __or__(self, other):
+        return Meaning(
+            (card_pos, cards | other[card_pos]) for (card_pos, cards) in self if card_pos in other
+        )
+
+
 def hint_informations(k):
     """
     Generate all possible informations.
@@ -94,13 +108,13 @@ class HintsManager:
         
         Return something like the following (every information restricts some cards to some values):
         {
-            Information(0,0): {
+            Information(0,0): Meaning({
                 Card 2: set([2 Yellow, 3 Red, 1 White]),
                 Card 3: set([5 Rainbow])
-            },
-            Information(0,1): {
+            }),
+            Information(0,1): Meaning({
                 ...
-            }
+            })
             ...
         
         At least one case should apply.
@@ -146,10 +160,7 @@ class HintsManager:
         # give hint on the highest ranked position
         card_pos = ranks.index(max(ranks))
         
-        meanings = {
-            information: {} for information in hint_informations(self.k)
-        }
-        
+        meanings = OrderedDict((information, Meaning()) for information in hint_informations(self.k))
         
         if sum(o) <= self.num_primary:
             # give one possibility to each primary slot
@@ -164,20 +175,69 @@ class HintsManager:
         else:
             # TODO
             pass
+        
+        return meanings
     
     
     def compute_information(self, player_id):
         """
         Compute information for the given player (different from myself).
-        Can use:
-        - that player's hand;
-        - all public knowledge;
-        - status of the game (turn number, deck size, discard pile, board, number of hints).
         """
         assert player_id != self.id
         hand = self.strategy.hands[player_id]
-        knowledge = self.public_knowledge[player_id]
+        meanings = self.compute_information_meanings(player)
         
+        for (information, meaning) in meanings.iteritems():
+            # does this meaning apply?
+            if all(hand[card_pos] is None or hand[card_pos] in cards for card_pos, cards in meaning.iteritems()):
+                # yes
+                return information
         
+        # strange, no information applied?
+        # close the baracca
+        assert False
+
+
+    def compute_hint(self):
+        """
+        Compute hint to give to some other player.
+        """
+        other_players_id = self.strategy.other_players_id()
+        s = sum(compute_information(player_id) for player_id in other_players_id)
+        
+        # choose hint type
+        hint_type = Action.HINT_TYPES[s.primary % 2]
+        
+        # choose player
+        player_id = other_players_id[s.primary / 2]
+        
+        # choose value
+        value = self.strategy.hands[player_id][s.secondary].value(hint_type)
+        
+        return HintAction(player_id, hint_type=hint_type, value=value)
+
+
+    def process_information(self, player_id, information):
+        """
+        Reconstruct things that a player deduces using the given information.
+        """
+        meanings = self.compute_information_meanings(player)
+        return meanings[information]
+
+    
+    def process_hint(self, hinter_id, hint_action):
+        """
+        Process hint given by someone.
+        """
+        hinted_players_id = self.other_players_id(exclude=hinter_id)
+        
+        # transform hint_action into informations
+        primary = Action.HINT_TYPES.index(hint_action.hint_type) + 2 * hinted_players_id.index(hint_action.player_id)
+        secondaries = hint_action.cards_pos
+        informations = [Information(self.k, primary, secondary) for secondary in secondaries]
+        
+        # reconstruct information given to each player
+        
+
 
 

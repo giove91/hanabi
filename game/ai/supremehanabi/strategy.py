@@ -99,8 +99,10 @@ class Strategy(BaseStrategy):
     def next_player_id(self):
         return (self.id + 1) % self.num_players
     
-    def other_players_id(self):
-        return [i for i in xrange(self.num_players) if i != self.id]
+    def other_players_id(self, exclude=None):
+        if exclude is None:
+            exclude = self.id
+        return [i for i in xrange(self.num_players) if i != exclude]
     
     
     def feed_turn(self, player_id, action):
