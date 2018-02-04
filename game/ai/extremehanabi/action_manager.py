@@ -4,9 +4,19 @@
 import sys
 import itertools
 import copy
+from collections import namedtuple
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.autograd import Variable
+from torch.distributions import Categorical
+
 
 from ...action import Action, PlayAction, DiscardAction, HintAction
 from ...card import Card
+
 
 class ActionManager(object):
     def __init__(self, strategy):
@@ -25,3 +35,6 @@ class ActionManager(object):
     
     def log(self, message):
         self.strategy.log(message)
+
+
+
