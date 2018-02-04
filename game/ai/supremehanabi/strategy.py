@@ -59,6 +59,9 @@ class Strategy(BaseStrategy):
         
         # remove cards of other players from possibilities
         self.update_knowledge()
+        
+        # create hints manager
+        self.hints_manager = HintsManager(self)
     
     
     def update(self, hints, lives, my_hand, hands, discard_pile, turn, last_turn, deck_size):
@@ -125,6 +128,8 @@ class Strategy(BaseStrategy):
         
         elif action.type == Action.HINT:
             # someone gave a hint!
+            self.hints_manager.process_hint(player_id, action)
+            
             for kn in self.all_knowledge:
                 if kn.player_id == action.player_id:
                     kn.update_with_hint(action)
@@ -147,6 +152,10 @@ class Strategy(BaseStrategy):
                 return PlayAction(card_pos=card_pos)
         
         if self.hints >= 1:
+            # give hint
+            hint_action = self.hints_manager.compute_hint()
+            return hint_action
+            """
             # give hint, looking for some unknown playable card
             for player_id in self.other_players_id():
                 for (card_pos, card) in enumerate(self.hands[player_id]):
@@ -161,6 +170,7 @@ class Strategy(BaseStrategy):
                         else:
                             # hint on number
                             return HintAction(player_id=player_id, number=card.number)
+            """
         
         # discard card
         for card_pos in xrange(self.k):

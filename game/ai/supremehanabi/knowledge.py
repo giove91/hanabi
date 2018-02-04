@@ -99,22 +99,25 @@ class Knowledge:
             assert len(self.possibilities[card_pos]) > 0 or self.hand()[card_pos] is None
     
     
-    def update_with_hint(self, action, meaning={}):
+    def update_with_meaning(self, meaning):
+        """
+        Update using meaning object.
+        This method is called before update_with_hint.
+        """
+        for (card_pos, cards) in meaning:
+            self.possibilities[card_pos] = Counter(
+                {card: v for (card, v) in p.iteritems() if card in cards}
+            )
+    
+    
+    def update_with_hint(self, action):
         """
         Update using hint.
         This method is called every time someone gives a hint.
-        Optionally a meaning is added (gives additional restrictions on the cards).
         """
         for (card_pos, p) in enumerate(self.possibilities):
-            additional_restrictions = None
-            if card_pos in meaning:
-                additional_restrictions = meaning[card_pos]
-            
             self.possibilities[card_pos] = Counter(
-                {
-                    card: v for (card, v) in p.iteritems() if card.matches_hint(action, card_pos) and \
-                    (additional_restrictions is None or card in additional_restrictions)
-                }
+                {card: v for (card, v) in p.iteritems() if card.matches_hint(action, card_pos)}
             )
     
     

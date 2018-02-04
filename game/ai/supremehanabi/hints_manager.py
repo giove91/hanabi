@@ -10,6 +10,8 @@ from ...action import Action, PlayAction, DiscardAction, HintAction
 from ...card import Card
 from ...game import Game
 
+from constants import *
+
 
 class HintInformation:
     """
@@ -26,7 +28,7 @@ class HintInformation:
         self.secondary = secondary
         
         assert 0 <= primary < 2*(k-1)
-        assert 0 <= secondary < cards_per_player
+        assert 0 <= secondary < self.cards_per_player
     
     
     def __add__(self, other):
@@ -37,7 +39,10 @@ class HintInformation:
         )
     
     def __radd__(self, other):
-        return self.__add__(other)
+        if other is 0:
+            return self
+        else:
+            return self.__add__(other)
     
     def __sub__(self, other):
         return HintInformation(
@@ -57,13 +62,19 @@ class Meaning(dict):
     """
     Dictionary of the form
         {card_pos: set of possible cards in this position}.
-    Supports "or" operation.
+    Supports + (it is actually an "or") operation.
     """
     
-    def __or__(self, other):
+    def __add__(self, other):
         return Meaning(
-            (card_pos, cards | other[card_pos]) for (card_pos, cards) in self if card_pos in other
+            (card_pos, cards | other[card_pos]) for (card_pos, cards) in self.iteritems() if card_pos in other
         )
+    
+    def __radd__(self, other):
+        if other is 0:
+            return self
+        else:
+            return self.__add__(other)
 
 
 def hint_informations(k):
@@ -91,8 +102,8 @@ class HintsManager:
         self.public_knowledge = strategy.public_knowledge
         
         # compute number of primary and secondary slots
-        self.num_primary = 2*(k-1)
-        self.num_secondary = Game.CARDS_PER_PLAYER[k]
+        self.num_primary = 2*(self.k-1)
+        self.num_secondary = Game.CARDS_PER_PLAYER[self.k]
     
     
     def log(self, message):
@@ -135,7 +146,7 @@ class HintsManager:
                 # 0: no card in the given position
                 rank = 0
             
-            elif sum(o) == 1:
+            elif sum(o.itervalues()) == 1:
                 # 1: card is known exactly
                 rank = 1
             
@@ -162,7 +173,7 @@ class HintsManager:
         
         meanings = OrderedDict((information, Meaning()) for information in hint_informations(self.k))
         
-        if sum(o) <= self.num_primary:
+        if sum(o.itervalues()) <= self.num_primary:
             # give one possibility to each primary slot
             
             p_list = knowledge.possibilities[card_pos].keys()
@@ -170,7 +181,7 @@ class HintsManager:
             for primary in xrange(self.num_primary):
                 cards = set([p_list[primary]]) if primary < len(p_list) else set()
                 for secondary in xrange(self.num_secondary):
-                    meanings[Information(self.k, primary, secondary)][card_pos] = cards
+                    meanings[HintInformation(self.k, primary, secondary)][card_pos] = cards
         
         else:
             # TODO
@@ -179,13 +190,16 @@ class HintsManager:
         return meanings
     
     
-    def compute_information(self, player_id):
+    def compute_information(self, player_id, meanings=None):
         """
         Compute information for the given player (different from myself).
+        If given, use the already computed meanings.
         """
         assert player_id != self.id
         hand = self.strategy.hands[player_id]
-        meanings = self.compute_information_meanings(player)
+        
+        if meanings is None:
+            meanings = self.compute_information_meanings(player_id)
         
         for (information, meaning) in meanings.iteritems():
             # does this meaning apply?
@@ -203,7 +217,7 @@ class HintsManager:
         Compute hint to give to some other player.
         """
         other_players_id = self.strategy.other_players_id()
-        s = sum(compute_information(player_id) for player_id in other_players_id)
+        s = sum(self.compute_information(player_id) for player_id in other_players_id)
         
         # choose hint type
         hint_type = Action.HINT_TYPES[s.primary % 2]
@@ -215,29 +229,54 @@ class HintsManager:
         value = self.strategy.hands[player_id][s.secondary].value(hint_type)
         
         return HintAction(player_id, hint_type=hint_type, value=value)
-
-
-    def process_information(self, player_id, information):
-        """
-        Reconstruct things that a player deduces using the given information.
-        """
-        meanings = self.compute_information_meanings(player)
-        return meanings[information]
-
+    
     
     def process_hint(self, hinter_id, hint_action):
         """
         Process hint given by someone.
         """
-        hinted_players_id = self.other_players_id(exclude=hinter_id)
+        hinted_players_id = self.strategy.other_players_id(exclude=hinter_id)
         
         # transform hint_action into informations
         primary = Action.HINT_TYPES.index(hint_action.hint_type) + 2 * hinted_players_id.index(hint_action.player_id)
         secondaries = hint_action.cards_pos
-        informations = [Information(self.k, primary, secondary) for secondary in secondaries]
+        informations_sum = [HintInformation(self.k, primary, secondary) for secondary in secondaries]
         
-        # reconstruct information given to each player
+        # compute meanings for every hinted player
+        players_to_meanings = {
+            player_id: self.compute_information_meanings(player_id) for player_id in hinted_players_id
+        }
         
+        # compute information of all the other players (from their hands)
+        visible_informations = {
+            player_id: self.compute_information(player_id, players_to_meanings[player_id]) \
+            for player_id in self.strategy.other_players_id() if player_id != hinter_id
+        }
+        
+        
+        # deduce things on my hand and update personal knowledge (if I am not the hinter)
+        if hinter_id != self.id:
+            my_informations = [information_sum - sum(visible_informations.itervalues()) for information_sum in informations_sum]    # the possible informations about my hand
+            
+            my_meaning = sum(players_to_meanings[self.id][information] for information in my_informations)
+            
+            # update personal knowledge
+            self.strategy.personal_knowledge.update_with_meaning(my_meaning)
+        
+        
+        # update public knowledge
+        for player_id in hinted_players_id:
+            if len(informations_sum) == 1:
+                # both primary and secondary information are public
+                meaning = visible_informations[player_id] if player_id != self.id else my_meaning
+            
+            else:
+                # only primary information is public!
+                primary = visible_informations[player_id].primary if player_id != self.id else my_informations[0].primary
+                meaning = sum(players_to_meanings[player_id][HintInformation(self.k, primary, secondary)] for secondary in xrange(self.num_secondary))
+                
+                # update public knowledge
+                self.strategy.public_knowledge[player_id].update_with_meaning(meaning)
 
 
 
