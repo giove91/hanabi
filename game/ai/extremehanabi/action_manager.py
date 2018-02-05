@@ -21,10 +21,11 @@ from ...card import Card, CardAppearance
 class PolicyNetwork(nn.Module):
     def __init__(self):
         super(PolicyNetwork, self).__init__()
-        self.affine1 = nn.Linear(655, 128)
-        self.affine2 = nn.Linear(128, 128)
-        self.action_head = nn.Linear(128, 3)
-        self.value_head = nn.Linear(128, 1)
+        SIZE = 256
+        self.affine1 = nn.Linear(655, SIZE)
+        self.affine2 = nn.Linear(SIZE, SIZE)
+        self.action_head = nn.Linear(SIZE, 3)
+        self.value_head = nn.Linear(SIZE, 1)
 
         self.saved_actions = []
         self.rewards = []
@@ -37,7 +38,7 @@ class PolicyNetwork(nn.Module):
         return F.softmax(action_scores, dim=0), state_values
 
 
-SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action'])
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action', 'state'])
 
 
 class ActionManager(object):
@@ -116,7 +117,7 @@ class ActionManager(object):
         m = Categorical(probs)
         action = m.sample()
         chosen_action = self.ACTIONS[action.data[0]]
-        self.model.saved_actions.append(SavedAction(m.log_prob(action), state_value, chosen_action))
+        self.model.saved_actions.append(SavedAction(m.log_prob(action), state_value, chosen_action, state))
         # return action.data[0]
         return chosen_action
 

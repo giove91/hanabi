@@ -11,8 +11,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.distributions import Categorical
 
-from game.ai.extremehanabi.action_manager import PolicyNetwork
+from game.ai.extremehanabi.action_manager import PolicyNetwork, ActionManager
 from game.game import Game
+from game.action import Action
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -50,7 +51,7 @@ def finish_episode(model, optimizer):
         rewards.insert(0, R)
     rewards = torch.Tensor(rewards)
     rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
-    for (log_prob, value, _), r in zip(saved_actions, rewards):
+    for (log_prob, value, _, _), r in zip(saved_actions, rewards):
         reward = r - value.data[0]
         policy_losses.append(-log_prob * reward)
         value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
@@ -61,13 +62,20 @@ def finish_episode(model, optimizer):
     del model.rewards[:]
     del model.saved_actions[:]
 
+"""
+def optimize_model(model, optimizer, memory):
+    [transition] = memory.sample(1)
+    
+    reward = transition.reward + 
+"""
 
 if __name__ == '__main__':
     
     model = PolicyNetwork()
-    optimizer = optim.Adam(model.parameters(), lr=3e-2)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    memory = ReplayMemory(1000)
     
-    for i_episode in xrange(1000):
+    while True:
         game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model})
         game.setup()
         
@@ -80,12 +88,28 @@ if __name__ == '__main__':
             reward = score - previous_score
             if lives == 0:
                 # the game is lost
-                reward -= 50
+                reward -= 50.0
             
             # TODO penalizzare azioni errate?
+            if model.saved_actions[-1].chosen_action == ActionManager.PLAY and turn.action.type != Action.PLAY:
+                reward -= 1.0
+            if model.saved_actions[-1].chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and game.hints == 0:
+                reward -= 1.0
             
             previous_score = score
             model.rewards.append(reward)
+            
+            """
+            # new part
+            reward = torch.Tensor([reward])
+            old_state = model.saved_actions[-1].state
+            new_state = game.players[(turn.number+1) % game.num_players].strategy.action_manager.get_state()
+            
+            memory.push(old_state, action, new_state, reward)
+            
+            # Perform one step of the optimization (on the target network)
+            optimize_model(model, optimizer, memory)
+            """
         
         print Counter(saved_action.chosen_action for saved_action in model.saved_actions)
         print game.statistics

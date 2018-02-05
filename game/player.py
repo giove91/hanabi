@@ -66,6 +66,7 @@ class Player:
                 discard_pile = get_appearance(self.game.discard_pile),
                 deck_size = len(self.game.deck)
             )
+        self.update_strategy()
     
     def update_strategy(self):
         """
