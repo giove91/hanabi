@@ -14,7 +14,6 @@ from .hints_manager import ValueHintsManager, PlayabilityHintsManager, CardHints
 from .action_manager import ActionManager
 
 
-
 class Knowledge:
     """
     An instance of this class represents what a player knows about a card, as known by everyone.
