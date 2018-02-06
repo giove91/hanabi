@@ -28,8 +28,7 @@ class PolicyNetwork(nn.Module):
         self.action_head = nn.Linear(SIZE, 2)
         self.value_head = nn.Linear(SIZE, 1)
 
-        self.saved_actions = []
-        self.rewards = []
+        self.saved_action = None
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
@@ -39,7 +38,7 @@ class PolicyNetwork(nn.Module):
         return F.softmax(action_scores, dim=0), state_values
 
 
-SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action', 'state'])
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action', 'state', 'action_variable'])
 
 
 class ActionManager(object):
@@ -125,12 +124,20 @@ class ActionManager(object):
         state = self.get_state()
         # print state
         probs, state_value = self.model(Variable(state))
-        m = Categorical(probs)
-        action = m.sample()
-        chosen_action = self.ACTIONS[action.data[0]]
-        self.model.saved_actions.append(SavedAction(m.log_prob(action), state_value, chosen_action, state))
-        # return action.data[0]
-        return chosen_action
+        
+        if 'training' in self.strategy.params and self.strategy.params['training']:
+            # sample from probability distribution
+            m = Categorical(probs)
+            action = m.sample()
+            chosen_action = self.ACTIONS[action.data[0]]
+            self.model.saved_action = SavedAction(m.log_prob(action), state_value, chosen_action, state, action)
+            return chosen_action
+        
+        else:
+            # choose best action
+            probs = probs.data.numpy()
+            self.log(probs)
+            return self.ACTIONS[probs.argmax()]
 
 
 

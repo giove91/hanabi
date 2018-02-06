@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, copy, random
 from collections import namedtuple, Counter
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
@@ -24,17 +24,27 @@ class ReplayMemory(object):
     def __init__(self, capacity):
         self.capacity = capacity
         self.memory = []
-        self.position = 0
+
+    def random_index(self):
+        return random.randint(0, len(self)-1)
 
     def push(self, *args):
-        """Saves a transition."""
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
+        self.memory.append(Transition(*args))
+        if len(self) > self.capacity:
+            del self.memory[self.random_index()]
 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
+    
+    def get(self):
+        if len(self) < self.capacity:
+            return None
+        
+        i = self.random_index()
+        x = self.memory[i]
+        del self.memory[i]
+        return x
+        
 
     def __len__(self):
         return len(self.memory)
@@ -63,29 +73,54 @@ def finish_episode(model, optimizer):
     del model.rewards[:]
     del model.saved_actions[:]
 
-"""
+
 def optimize_model(model, optimizer, memory):
-    [transition] = memory.sample(1)
+    transition = memory.get()
+    if transition is None:
+        return
     
-    reward = transition.reward + 
-"""
+    # print transition.state
+    # print transition.next_state
+    
+    probs, state_value = model(Variable(transition.state))
+    _, next_state_value = model(Variable(transition.next_state))
+    
+    R = next_state_value + Variable(transition.reward) # obtained reward
+    V = state_value  # expected reward
+    
+    m = Categorical(probs) # probability distribution of actions
+    
+    L_actor = - m.log_prob(transition.action) * (R-V).detach()
+    L_critic = (R-V)**2
+    
+    optimizer.zero_grad()
+    loss = L_actor + L_critic
+    loss.backward()
+    optimizer.step()
+
 
 if __name__ == '__main__':
     
     model = PolicyNetwork()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    memory = ReplayMemory(1000)
+    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    memory = ReplayMemory(100)
     
     running_avg = 0.0
     
+    old_reward = None
+    old_action = None
+    old_state = None
+    
+    
     while True:
-        game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model})
+        game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model, 'training': True})
         game.setup()
         
         # train only on good decks
         if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
             continue
         
+        chosen_actions = []
         previous_score = game.get_current_score()
         
         for player, turn in game.run_game():
@@ -94,29 +129,32 @@ if __name__ == '__main__':
             
             reward = score - previous_score
             
-            # TODO penalizzare azioni errate?
-            if model.saved_actions[-1].chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and game.hints == 0:
+            # penalize wrong action
+            if model.saved_action.chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and game.hints == 0:
                 reward -= 1.0
             
             previous_score = score
-            model.rewards.append(reward)
+            # model.rewards.append(reward)
             
-            """
-            # new part
-            reward = torch.Tensor([reward])
-            old_state = model.saved_actions[-1].state
-            new_state = game.players[(turn.number+1) % game.num_players].strategy.action_manager.get_state()
+            chosen_actions.append(model.saved_action.chosen_action)
             
-            memory.push(old_state, action, new_state, reward)
+            # store previous transition in memory
+            if old_state is not None:
+                memory.push(old_state, old_action, model.saved_action.state, old_reward)
+            
+            old_reward = torch.Tensor([reward])
+            old_state = model.saved_action.state
+            old_action = model.saved_action.action_variable
             
             # Perform one step of the optimization (on the target network)
             optimize_model(model, optimizer, memory)
-            """
         
-        print Counter(saved_action.chosen_action for saved_action in model.saved_actions)
+        # TODO add last turn
+        
+        print Counter(chosen_actions)
         print game.statistics
-        running_avg = 0.9 * running_avg + 0.1 * game.statistics.score
+        running_avg = 0.99 * running_avg + 0.01 * game.statistics.score
         print "Running average score: %.2f" % running_avg
         
-        finish_episode(model, optimizer)
+        # finish_episode(model, optimizer)
 
