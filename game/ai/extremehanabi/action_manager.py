@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os
 import itertools
 import copy
 from collections import namedtuple
@@ -21,11 +22,11 @@ from ...card import Card, CardAppearance
 class PolicyNetwork(nn.Module):
     def __init__(self):
         super(PolicyNetwork, self).__init__()
-        INPUT_SIZE = 4
+        INPUT_SIZE = 6
         SIZE = 256
         self.affine1 = nn.Linear(INPUT_SIZE, SIZE)
         self.affine2 = nn.Linear(SIZE, SIZE)
-        self.action_head = nn.Linear(SIZE, 2)
+        self.action_head = nn.Linear(SIZE, 3)
         self.value_head = nn.Linear(SIZE, 1)
 
         self.saved_action = None
@@ -47,7 +48,9 @@ class ActionManager(object):
     PLAY = 'Play'
     DISCARD = 'Discard'
     HINT = 'Hint'
-    ACTIONS = [DISCARD, HINT]
+    ACTIONS = [PLAY, DISCARD, HINT]
+    
+    MODEL_FILENAME = 'game/ai/extremehanabi/model.tar'
     
     def __init__(self, strategy):
         self.strategy = strategy    # my strategy object
@@ -68,7 +71,10 @@ class ActionManager(object):
         if 'model' in strategy.params:
             # use the neural network given as a parameter
             self.model = strategy.params['model']
+        elif os.path.isfile(self.MODEL_FILENAME):
+            self.model = torch.load(self.MODEL_FILENAME)
         else:
+            raise Exception("Model not found")
             self.model = PolicyNetwork()
     
     
@@ -87,6 +93,9 @@ class ActionManager(object):
         
         # lives
         # state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
+        
+        # score
+        state.append(sum(self.strategy.board.itervalues()) * 2.0 / 30.0 - 1.0)
         
         """
         # board
@@ -111,6 +120,9 @@ class ActionManager(object):
                 state.append(1 if self.knowledge[i][card_pos].knows_exactly() or self.knowledge[i][card_pos].useless else 0)
         """
         
+        # do I have a 100% playable card?
+        state.append(any(len(p) > 0 and all(not card.playable(self.board) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
+        
         # do I have a 100% useless card?
         state.append(any(len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
         
@@ -124,6 +136,8 @@ class ActionManager(object):
         state = self.get_state()
         # print state
         probs, state_value = self.model(Variable(state))
+        self.log("Probabilities: %r" % list(probs.data))
+        self.log("Value: %r" % float(state_value.data))
         
         if 'training' in self.strategy.params and self.strategy.params['training']:
             # sample from probability distribution
@@ -136,7 +150,6 @@ class ActionManager(object):
         else:
             # choose best action
             probs = probs.data.numpy()
-            self.log(probs)
             return self.ACTIONS[probs.argmax()]
 
 

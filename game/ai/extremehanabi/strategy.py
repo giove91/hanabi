@@ -413,6 +413,33 @@ class Strategy(BaseStrategy):
         if self.deck_size < self.DECK_SIZE_BEFORE_FULL_SEARCH[self.k]:
             self.update_possibilities_with_combinations()
         
+        
+        # use neural network to determine action
+        action = self.action_manager.select_action()
+        self.log("chosen action is %r" % action)
+        
+        if action == ActionManager.PLAY:
+            if self.last_turn is not None:
+                card_pos = self.get_best_play_last_round()
+            else:
+                card_pos = self.get_best_play()
+            if card_pos is not None:
+                # play the card
+                return PlayAction(card_pos=card_pos)
+        
+        if action == ActionManager.HINT and self.hints > 0:
+            hints_manager = self.hints_scheduler.select_hints_manager(self.id, self.turn)
+            hint_action = hints_manager.get_hint()
+            
+            if hint_action is not None:
+                return hint_action
+            
+        # discard card
+        return DiscardAction(card_pos=self.get_best_discard()[0])
+        
+        
+        ### backup plan follows (if failed to to the chosen action) ###
+        
         # if this is the last round, play accordingly
         if self.last_turn is not None:
             card_pos = self.get_best_play_last_round()
@@ -427,35 +454,9 @@ class Strategy(BaseStrategy):
                 # play the card
                 return PlayAction(card_pos=card_pos)
         
-        
-        # use neural network to determine action
-        action = self.action_manager.select_action()
-        self.log("chosen action is %r" % action)
-        
-        """
-        if action == ActionManager.PLAY:
-            if self.last_turn is not None:
-                card_pos = self.get_best_play_last_round()
-            else:
-                card_pos = self.get_best_play()
-            if card_pos is not None:
-                # play the card
-                return PlayAction(card_pos=card_pos)
-        """
-        
-        if action == ActionManager.HINT and self.hints > 0:
-            hints_manager = self.hints_scheduler.select_hints_manager(self.id, self.turn)
-            hint_action = hints_manager.get_hint()
-            
-            if hint_action is not None:
-                return hint_action
-            
-        # if action == ActionManager.DISCARD:
         # discard card
         return DiscardAction(card_pos=self.get_best_discard()[0])
         
-        
-        ### backup plan follows (if failed to to the chosen action) ###
         
         if self.hints == 0:
             # discard card
