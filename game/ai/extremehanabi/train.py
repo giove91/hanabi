@@ -14,6 +14,7 @@ from torch.distributions import Categorical
 from game.ai.extremehanabi.action_manager import PolicyNetwork, ActionManager
 from game.game import Game
 from game.action import Action
+from game.card import Card
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -75,9 +76,15 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     memory = ReplayMemory(1000)
     
+    running_avg = 0.0
+    
     while True:
         game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model})
         game.setup()
+        
+        # train only on good decks
+        if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
+            continue
         
         previous_score = game.get_current_score()
         
@@ -86,13 +93,8 @@ if __name__ == '__main__':
             lives = game.lives
             
             reward = score - previous_score
-            if lives == 0:
-                # the game is lost
-                reward -= 50.0
             
             # TODO penalizzare azioni errate?
-            if model.saved_actions[-1].chosen_action == ActionManager.PLAY and turn.action.type != Action.PLAY:
-                reward -= 1.0
             if model.saved_actions[-1].chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and game.hints == 0:
                 reward -= 1.0
             
@@ -113,5 +115,8 @@ if __name__ == '__main__':
         
         print Counter(saved_action.chosen_action for saved_action in model.saved_actions)
         print game.statistics
+        running_avg = 0.9 * running_avg + 0.1 * game.statistics.score
+        print "Running average score: %.2f" % running_avg
+        
         finish_episode(model, optimizer)
 

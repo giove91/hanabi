@@ -21,10 +21,11 @@ from ...card import Card, CardAppearance
 class PolicyNetwork(nn.Module):
     def __init__(self):
         super(PolicyNetwork, self).__init__()
+        INPUT_SIZE = 4
         SIZE = 256
-        self.affine1 = nn.Linear(655, SIZE)
+        self.affine1 = nn.Linear(INPUT_SIZE, SIZE)
         self.affine2 = nn.Linear(SIZE, SIZE)
-        self.action_head = nn.Linear(SIZE, 3)
+        self.action_head = nn.Linear(SIZE, 2)
         self.value_head = nn.Linear(SIZE, 1)
 
         self.saved_actions = []
@@ -47,7 +48,7 @@ class ActionManager(object):
     PLAY = 'Play'
     DISCARD = 'Discard'
     HINT = 'Hint'
-    ACTIONS = [PLAY, DISCARD, HINT]
+    ACTIONS = [DISCARD, HINT]
     
     def __init__(self, strategy):
         self.strategy = strategy    # my strategy object
@@ -61,6 +62,7 @@ class ActionManager(object):
         self.board = strategy.board
         self.knowledge = strategy.knowledge
         self.hands = self.strategy.hands
+        self.discard_pile = self.strategy.discard_pile
         
         self.COLORS_TO_NUMBERS = {color: i for (i, color) in enumerate(Card.COLORS)}
         
@@ -85,8 +87,9 @@ class ActionManager(object):
         state.append(self.strategy.hints * 2.0 / 8.0 - 1.0)
         
         # lives
-        state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
+        # state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
         
+        """
         # board
         for color in Card.COLORS:
             for i in xrange(Card.NUM_NUMBERS+1):
@@ -107,12 +110,20 @@ class ActionManager(object):
                 
                 # knowledge
                 state.append(1 if self.knowledge[i][card_pos].knows_exactly() or self.knowledge[i][card_pos].useless else 0)
+        """
+        
+        # do I have a 100% useless card?
+        state.append(any(len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
+        
+        # do I have a 100% non-relevant card?
+        state.append(any(len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
         
         return torch.Tensor(state)
     
     
     def select_action(self):
         state = self.get_state()
+        # print state
         probs, state_value = self.model(Variable(state))
         m = Categorical(probs)
         action = m.sample()
