@@ -1,5 +1,6 @@
 import sys, os, copy, random
 from collections import namedtuple, Counter
+import argparse
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
 
@@ -33,8 +34,17 @@ class ReplayMemory(object):
         if len(self) > self.capacity:
             del self.memory[self.random_index()]
 
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+    def sample(self, batch_size=32):
+        if len(self) < self.capacity:
+            return None
+        res = random.sample(self.memory, batch_size)
+        
+        states = torch.stack([transition.state for transition in res])
+        actions = torch.stack([transition.action for transition in res])
+        next_states = torch.stack([transition.next_state for transition in res])
+        rewards = torch.stack([transition.reward for transition in res])
+        
+        return states, actions, next_states, rewards
     
     def get(self):
         if len(self) < self.capacity:
@@ -42,7 +52,7 @@ class ReplayMemory(object):
         
         i = self.random_index()
         x = self.memory[i]
-        del self.memory[i]
+        # del self.memory[i]
         return x
         
 
@@ -50,7 +60,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-
+"""
 def finish_episode(model, optimizer):
     R = 0   # reward
     saved_actions = model.saved_actions
@@ -72,41 +82,49 @@ def finish_episode(model, optimizer):
     optimizer.step()
     del model.rewards[:]
     del model.saved_actions[:]
+"""
 
-
-def optimize_model(model, optimizer, memory):
-    transition = memory.get()
-    if transition is None:
+def optimize_model(model, optimizer, memory, batch_size=32):
+    res = memory.sample(batch_size)
+    if res is None:
         return
     
-    # print transition.state
-    # print transition.next_state
+    states, actions, next_states, rewards = res
     
-    probs, state_value = model(Variable(transition.state))
-    _, next_state_value = model(Variable(transition.next_state))
+    action_scores, state_values = model(Variable(states))
+    _, next_state_values = model(Variable(next_states))
     
-    R = next_state_value + Variable(transition.reward) # obtained reward
-    V = state_value  # expected reward
+    R = next_state_values + Variable(rewards) # obtained reward
+    V = state_values  # expected reward
     
-    m = Categorical(probs) # probability distribution of actions
+    # probs = action_scores.exp()
+    # m = Categorical(probs) # probability distribution of actions
+    # print action_scores, actions
     
-    L_actor = - m.log_prob(transition.action) * (R-V).detach()
+    # compute log_prob of chosen actions
+    log_probs = torch.masked_select(action_scores, mask=actions).unsqueeze(1)
+    
+    L_actor = - log_probs * (R-V).detach()
     L_critic = (R-V)**2
     
     optimizer.zero_grad()
-    loss = L_actor + L_critic
+    loss = (L_actor + L_critic).sum() / batch_size
     loss.backward()
     optimizer.step()
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train the network.')
+    parser.add_argument('-c', '--clear', action='store_true', help='clear the network before training')
+    args = parser.parse_args()
     
-    if os.path.isfile("model.tar"):
+    if not args.clear and os.path.isfile("model.tar"):
         # load model from file
         model = torch.load("model.tar")
-        print "Loaded model from file"
+        print >> sys.stderr, "Loaded model from file"
     else:
         model = PolicyNetwork()
+        print >> sys.stderr, "Created new model"
     
     optimizer = optim.Adam(model.parameters(), lr=4e-4)
     memory = ReplayMemory(200)
@@ -169,6 +187,8 @@ if __name__ == '__main__':
             print game.statistics
             running_avg = 0.95 * running_avg + 0.05 * game.statistics.score
             print "Running average score: %.2f" % running_avg
+            
+            print "Memory size:", len(memory)
             
             iteration += 1
             

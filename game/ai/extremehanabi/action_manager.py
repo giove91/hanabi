@@ -28,15 +28,18 @@ class PolicyNetwork(nn.Module):
         self.affine2 = nn.Linear(SIZE, SIZE)
         self.action_head = nn.Linear(SIZE, 3)
         self.value_head = nn.Linear(SIZE, 1)
-
+        self.logsoftmax = nn.LogSoftmax(dim=1)
+        
         self.saved_action = None
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
         x = F.relu(self.affine2(x))
-        action_scores = self.action_head(x)
-        state_values = self.value_head(x)
-        return F.softmax(action_scores, dim=0), state_values
+        action_score = self.action_head(x)
+        state_value = self.value_head(x)
+        #return action_score, state_value
+        #return F.softmax(action_scores, dim=0), state_values
+        return self.logsoftmax(action_score), state_value
 
 
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action', 'state', 'action_variable'])
@@ -135,7 +138,8 @@ class ActionManager(object):
     def select_action(self):
         state = self.get_state()
         # print state
-        probs, state_value = self.model(Variable(state))
+        action_score, state_value = self.model(Variable(state.unsqueeze(0)))
+        probs = action_score.exp()
         self.log("Probabilities: %r" % list(probs.data))
         self.log("Value: %r" % float(state_value.data))
         
@@ -144,7 +148,8 @@ class ActionManager(object):
             m = Categorical(probs)
             action = m.sample()
             chosen_action = self.ACTIONS[action.data[0]]
-            self.model.saved_action = SavedAction(m.log_prob(action), state_value, chosen_action, state, action)
+            action_mask = Variable(torch.ByteTensor([1 if i==action.data[0] else 0 for i in xrange(len(self.ACTIONS))]))
+            self.model.saved_action = SavedAction(m.log_prob(action), state_value, chosen_action, state, action_mask)
             return chosen_action
         
         else:
