@@ -1,4 +1,4 @@
-import sys, os, copy, random
+import sys, os, copy, random, math
 from collections import namedtuple, Counter
 import argparse
 
@@ -31,6 +31,7 @@ class ReplayMemory(object):
 
     def push(self, *args):
         self.memory.append(Transition(*args))
+        # print self.memory[-1]
         if len(self) > self.capacity:
             del self.memory[self.random_index()]
 
@@ -90,25 +91,29 @@ def optimize_model(model, optimizer, memory, batch_size=32):
         return
     
     states, actions, next_states, rewards = res
-    
+    """
+    print states,
+    print actions,
+    print next_states,
+    print rewards
+    sys.exit(0)
+    """
     action_scores, state_values = model(Variable(states))
     _, next_state_values = model(Variable(next_states))
     
-    R = next_state_values + Variable(rewards) # obtained reward
+    R = (next_state_values + Variable(rewards)).detach() # obtained reward
     V = state_values  # expected reward
-    
-    # probs = action_scores.exp()
-    # m = Categorical(probs) # probability distribution of actions
-    # print action_scores, actions
     
     # compute log_prob of chosen actions
     log_probs = torch.masked_select(action_scores, mask=actions).unsqueeze(1)
     
     L_actor = - log_probs * (R-V).detach()
-    L_critic = (R-V)**2
+    L_critic = 0.5 * (R-V)**2
+    # L_critic = 0.5 * F.smooth_l1_loss(V, R)
+    L_entropy = 0.001 * (log_probs.exp() * log_probs).sum(dim=-1)
     
     optimizer.zero_grad()
-    loss = (L_actor + L_critic).sum() / batch_size
+    loss = (L_actor + L_critic + L_entropy).sum() / batch_size
     loss.backward()
     optimizer.step()
 
@@ -116,6 +121,10 @@ def optimize_model(model, optimizer, memory, batch_size=32):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train the network.')
     parser.add_argument('-c', '--clear', action='store_true', help='clear the network before training')
+    parser.add_argument('-e', '--epsilon', default=0.9, type=float, help='initial probability to choose a random action during training')
+    parser.add_argument('-d', '--decay', default=200.0, type=float, help='epsilon decay')
+    parser.add_argument('-f', '--final', default=0.05, type=float, help='final epsilon')
+    
     args = parser.parse_args()
     
     if not args.clear and os.path.isfile("model.tar"):
@@ -127,19 +136,26 @@ if __name__ == '__main__':
         print >> sys.stderr, "Created new model"
     
     optimizer = optim.Adam(model.parameters(), lr=4e-4)
-    memory = ReplayMemory(200)
+    memory = ReplayMemory(300)
     
     running_avg = 0.0
+    running_reward = 0.0
     
     old_reward = None
     old_action = None
     old_state = None
+    old_hints = None
     
     try:
         iteration = 0
         while True:
-            game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model, 'training': True}, strategy_log=(random.randint(0,10) == -1))
+            eps_threshold = args.final + (args.epsilon - args.final) * math.exp(-1. * iteration / args.decay)
+            game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model, 'training': eps_threshold}, strategy_log=(random.randint(0,10) == -1))
+            print "Epsilon threshold:", eps_threshold
+            
             game.setup()
+            old_hints = game.hints
+            game_reward = 0.0
             
             # train only on good decks
             if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
@@ -151,19 +167,30 @@ if __name__ == '__main__':
             for player, turn in game.run_game():
                 score = game.get_current_score()
                 lives = game.lives
+                reward = 0.0
                 
-                reward = score - previous_score
+                # game.log_turn(turn, player)
+                # game.log_status()
+                
+                # Hanabi score reward
+                # reward = score - previous_score
                 
                 # penalize wrong action
-                """
-                if model.saved_action.chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and game.hints == 0:
+                if model.saved_action.chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and old_hints == 0:
                     reward -= 1.0
                 
                 if model.saved_action.chosen_action == ActionManager.PLAY and turn.action.type != Action.PLAY and not game.last_round:
-                    reward -= 1.0
-                """
+                    reward -= 2.0
                 
-                reward = float(reward) / 30.0
+                # do not discard if there are hints
+                if model.saved_action.chosen_action == ActionManager.DISCARD and old_hints > 0:
+                    reward -= 1.0
+                
+                # print model.saved_action.chosen_action, turn.action.type, old_hints
+                # print reward
+                # reward = float(reward) / 30.0
+                reward = float(reward)
+                game_reward += reward
                 
                 previous_score = score
                 # model.rewards.append(reward)
@@ -177,6 +204,7 @@ if __name__ == '__main__':
                 old_reward = torch.Tensor([reward])
                 old_state = model.saved_action.state
                 old_action = model.saved_action.action_variable
+                old_hints = game.hints
                 
                 # Perform one step of the optimization (on the target network)
                 optimize_model(model, optimizer, memory)
@@ -186,7 +214,10 @@ if __name__ == '__main__':
             print Counter(chosen_actions)
             print game.statistics
             running_avg = 0.95 * running_avg + 0.05 * game.statistics.score
+            running_reward = 0.95 * running_reward + 0.05 * game_reward
             print "Running average score: %.2f" % running_avg
+            # print "Running average reward: %.2f" % running_reward
+            print "Game reward: %.2f" % game_reward
             
             print "Memory size:", len(memory)
             

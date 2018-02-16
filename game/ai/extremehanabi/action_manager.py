@@ -6,6 +6,7 @@ import os
 import itertools
 import copy
 from collections import namedtuple
+import random
 
 import torch
 import torch.nn as nn
@@ -25,6 +26,7 @@ class PolicyNetwork(nn.Module):
         INPUT_SIZE = 6
         SIZE = 256
         self.affine1 = nn.Linear(INPUT_SIZE, SIZE)
+        # self.batch_normalization = nn.BatchNorm1d(SIZE)
         self.affine2 = nn.Linear(SIZE, SIZE)
         self.action_head = nn.Linear(SIZE, 3)
         self.value_head = nn.Linear(SIZE, 1)
@@ -33,16 +35,17 @@ class PolicyNetwork(nn.Module):
         self.saved_action = None
 
     def forward(self, x):
+        # x = F.relu(self.batch_normalization(self.affine1(x)))
         x = F.relu(self.affine1(x))
         x = F.relu(self.affine2(x))
         action_score = self.action_head(x)
         state_value = self.value_head(x)
-        #return action_score, state_value
-        #return F.softmax(action_scores, dim=0), state_values
+        
         return self.logsoftmax(action_score), state_value
+        # return self.logsoftmax(action_score), Variable(torch.zeros(1))
 
 
-SavedAction = namedtuple('SavedAction', ['log_prob', 'value', 'chosen_action', 'state', 'action_variable'])
+SavedAction = namedtuple('SavedAction', ['value', 'chosen_action', 'state', 'action_variable'])
 
 
 class ActionManager(object):
@@ -94,13 +97,22 @@ class ActionManager(object):
         # hints
         state.append(self.strategy.hints * 2.0 / 8.0 - 1.0)
         
-        # lives
-        # state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
-        
         # score
         state.append(sum(self.strategy.board.itervalues()) * 2.0 / 30.0 - 1.0)
         
+        # do I have a 100% playable card?
+        state.append(any(len(p) > 0 and all(card.playable(self.board) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
+        
+        # do I have a 100% useless card?
+        state.append(any(len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
+        
+        # do I have a 100% non-relevant card?
+        state.append(any(len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
+        
         """
+        # lives
+        # state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
+        
         # board
         for color in Card.COLORS:
             for i in xrange(Card.NUM_NUMBERS+1):
@@ -123,15 +135,6 @@ class ActionManager(object):
                 state.append(1 if self.knowledge[i][card_pos].knows_exactly() or self.knowledge[i][card_pos].useless else 0)
         """
         
-        # do I have a 100% playable card?
-        state.append(any(len(p) > 0 and all(not card.playable(self.board) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
-        
-        # do I have a 100% useless card?
-        state.append(any(len(p) > 0 and all(not card.useful(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
-        
-        # do I have a 100% non-relevant card?
-        state.append(any(len(p) > 0 and all(not card.relevant(self.board, self.full_deck, self.discard_pile) for card in p) for (card_pos, p) in enumerate(self.possibilities)))
-        
         return torch.Tensor(state)
     
     
@@ -142,20 +145,30 @@ class ActionManager(object):
         probs = action_score.exp()
         self.log("Probabilities: %r" % list(probs.data))
         self.log("Value: %r" % float(state_value.data))
-        
+        """
         if 'training' in self.strategy.params and self.strategy.params['training']:
             # sample from probability distribution
             m = Categorical(probs)
             action = m.sample()
             chosen_action = self.ACTIONS[action.data[0]]
             action_mask = Variable(torch.ByteTensor([1 if i==action.data[0] else 0 for i in xrange(len(self.ACTIONS))]))
-            self.model.saved_action = SavedAction(m.log_prob(action), state_value, chosen_action, state, action_mask)
+            self.model.saved_action = SavedAction(state_value, chosen_action, state, action_mask)
             return chosen_action
+        """
+        
+        if 'training' in self.strategy.params and random.random() < self.strategy.params['training']:
+            # choose at random
+            action = random.randint(0, len(self.ACTIONS)-1)
         
         else:
             # choose best action
             probs = probs.data.numpy()
-            return self.ACTIONS[probs.argmax()]
+            action = probs.argmax()
+        
+        chosen_action = self.ACTIONS[action]
+        action_mask = Variable(torch.ByteTensor([1 if i==action else 0 for i in xrange(len(self.ACTIONS))]))
+        self.model.saved_action = SavedAction(state_value, chosen_action, state, action_mask)
+        return chosen_action
 
 
 
