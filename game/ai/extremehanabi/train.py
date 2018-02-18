@@ -86,6 +86,7 @@ def finish_episode(model, optimizer):
 """
 
 def optimize_model(model, optimizer, memory, batch_size=32):
+    model.train() # training mode
     res = memory.sample(batch_size)
     if res is None:
         return
@@ -96,7 +97,6 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     print actions,
     print next_states,
     print rewards
-    sys.exit(0)
     """
     action_scores, state_values = model(Variable(states))
     _, next_state_values = model(Variable(next_states))
@@ -110,10 +110,11 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     L_actor = - log_probs * (R-V).detach()
     L_critic = 0.5 * (R-V)**2
     # L_critic = 0.5 * F.smooth_l1_loss(V, R)
-    L_entropy = 0.001 * (log_probs.exp() * log_probs).sum(dim=-1)
+    # L_entropy = 0.001 * (log_probs.exp() * log_probs).sum(dim=-1)
     
     optimizer.zero_grad()
-    loss = (L_actor + L_critic + L_entropy).sum() / batch_size
+    loss = (L_actor + L_critic).sum() / batch_size
+    # loss = (L_actor + L_critic + L_entropy).sum() / batch_size
     loss.backward()
     optimizer.step()
 
@@ -135,8 +136,8 @@ if __name__ == '__main__':
         model = PolicyNetwork()
         print >> sys.stderr, "Created new model"
     
-    optimizer = optim.Adam(model.parameters(), lr=4e-4)
-    memory = ReplayMemory(300)
+    optimizer = optim.Adam(model.parameters(), lr=1e-5)
+    memory = ReplayMemory(200)
     
     running_avg = 0.0
     running_reward = 0.0
@@ -151,7 +152,6 @@ if __name__ == '__main__':
         while True:
             eps_threshold = args.final + (args.epsilon - args.final) * math.exp(-1. * iteration / args.decay)
             game = Game(num_players=5, ai="extremehanabi", ai_params={'model': model, 'training': eps_threshold}, strategy_log=(random.randint(0,10) == -1))
-            print "Epsilon threshold:", eps_threshold
             
             game.setup()
             old_hints = game.hints
@@ -160,6 +160,8 @@ if __name__ == '__main__':
             # train only on good decks
             if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
                 continue
+            
+            print "Epsilon threshold:", eps_threshold
             
             chosen_actions = []
             previous_score = game.get_current_score()
@@ -177,7 +179,7 @@ if __name__ == '__main__':
                 
                 # penalize wrong action
                 if model.saved_action.chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and old_hints == 0:
-                    reward -= 1.0
+                    reward -= 3.0
                 
                 if model.saved_action.chosen_action == ActionManager.PLAY and turn.action.type != Action.PLAY and not game.last_round:
                     reward -= 2.0
@@ -219,7 +221,8 @@ if __name__ == '__main__':
             # print "Running average reward: %.2f" % running_reward
             print "Game reward: %.2f" % game_reward
             
-            print "Memory size:", len(memory)
+            if len(memory) < memory.capacity:
+                print "Memory size:", len(memory)
             
             iteration += 1
             

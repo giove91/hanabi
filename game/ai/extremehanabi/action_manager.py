@@ -24,10 +24,15 @@ class PolicyNetwork(nn.Module):
     def __init__(self):
         super(PolicyNetwork, self).__init__()
         INPUT_SIZE = 6
-        SIZE = 256
+        SIZE = 10
         self.affine1 = nn.Linear(INPUT_SIZE, SIZE)
-        # self.batch_normalization = nn.BatchNorm1d(SIZE)
+        self.batch_norm1 = nn.BatchNorm1d(SIZE)       
+        self.dropout1 = nn.Dropout()
+         
         self.affine2 = nn.Linear(SIZE, SIZE)
+        self.batch_norm2 = nn.BatchNorm1d(SIZE)
+        self.dropout2 = nn.Dropout()
+        
         self.action_head = nn.Linear(SIZE, 3)
         self.value_head = nn.Linear(SIZE, 1)
         self.logsoftmax = nn.LogSoftmax(dim=1)
@@ -35,14 +40,16 @@ class PolicyNetwork(nn.Module):
         self.saved_action = None
 
     def forward(self, x):
-        # x = F.relu(self.batch_normalization(self.affine1(x)))
-        x = F.relu(self.affine1(x))
-        x = F.relu(self.affine2(x))
+        x = F.relu(self.batch_norm1(self.affine1(x)))
+        x = self.dropout1(x)
+        
+        x = F.relu(self.batch_norm2(self.affine2(x)))
+        x = self.dropout2(x)
+        
         action_score = self.action_head(x)
         state_value = self.value_head(x)
         
         return self.logsoftmax(action_score), state_value
-        # return self.logsoftmax(action_score), Variable(torch.zeros(1))
 
 
 SavedAction = namedtuple('SavedAction', ['value', 'chosen_action', 'state', 'action_variable'])
@@ -95,7 +102,10 @@ class ActionManager(object):
         state.append(self.strategy.deck_size * 2.0 / 55.0 - 1.0)
         
         # hints
-        state.append(self.strategy.hints * 2.0 / 8.0 - 1.0)
+        # for i in xrange(9):
+        #     state.append(1.0 if self.strategy.hints == i else 0.0)
+        # state.append(self.strategy.hints * 2.0 / 8.0 - 1.0)
+        state.append(1.0 if self.strategy.hints > 0 else 0.0)
         
         # score
         state.append(sum(self.strategy.board.itervalues()) * 2.0 / 30.0 - 1.0)
@@ -140,7 +150,8 @@ class ActionManager(object):
     
     def select_action(self):
         state = self.get_state()
-        # print state
+        self.model.eval() # evaluation mode
+        
         action_score, state_value = self.model(Variable(state.unsqueeze(0)))
         probs = action_score.exp()
         self.log("Probabilities: %r" % list(probs.data))
