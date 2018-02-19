@@ -25,6 +25,7 @@ class PolicyNetwork(nn.Module):
         super(PolicyNetwork, self).__init__()
         INPUT_SIZE = 6
         SIZE = 10
+        
         self.affine1 = nn.Linear(INPUT_SIZE, SIZE)
         self.batch_norm1 = nn.BatchNorm1d(SIZE)       
         self.dropout1 = nn.Dropout()
@@ -156,20 +157,11 @@ class ActionManager(object):
         probs = action_score.exp()
         self.log("Probabilities: %r" % list(probs.data))
         self.log("Value: %r" % float(state_value.data))
-        """
-        if 'training' in self.strategy.params and self.strategy.params['training']:
+        
+        if 'training' in self.strategy.params:
             # sample from probability distribution
             m = Categorical(probs)
-            action = m.sample()
-            chosen_action = self.ACTIONS[action.data[0]]
-            action_mask = Variable(torch.ByteTensor([1 if i==action.data[0] else 0 for i in xrange(len(self.ACTIONS))]))
-            self.model.saved_action = SavedAction(state_value, chosen_action, state, action_mask)
-            return chosen_action
-        """
-        
-        if 'training' in self.strategy.params and random.random() < self.strategy.params['training']:
-            # choose at random
-            action = random.randint(0, len(self.ACTIONS)-1)
+            action = m.sample().data[0]
         
         else:
             # choose best action
@@ -180,6 +172,12 @@ class ActionManager(object):
         action_mask = Variable(torch.ByteTensor([1 if i==action else 0 for i in xrange(len(self.ACTIONS))]))
         self.model.saved_action = SavedAction(state_value, chosen_action, state, action_mask)
         return chosen_action
+        
+        """
+        if 'training' in self.strategy.params and random.random() < self.strategy.params['training']:
+            # choose at random
+            action = random.randint(0, len(self.ACTIONS)-1)
+        """
 
 
 

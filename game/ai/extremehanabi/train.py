@@ -100,7 +100,11 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     """
     action_scores, state_values = model(Variable(states))
     _, next_state_values = model(Variable(next_states))
-    
+    """
+    print action_scores.exp()
+    print states
+    print state_values
+    """
     R = (next_state_values + Variable(rewards)).detach() # obtained reward
     V = state_values  # expected reward
     
@@ -110,11 +114,11 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     L_actor = - log_probs * (R-V).detach()
     L_critic = 0.5 * (R-V)**2
     # L_critic = 0.5 * F.smooth_l1_loss(V, R)
-    # L_entropy = 0.001 * (log_probs.exp() * log_probs).sum(dim=-1)
+    L_entropy = 0.0001 * (log_probs.exp() * log_probs).sum(dim=-1)
     
     optimizer.zero_grad()
-    loss = (L_actor + L_critic).sum() / batch_size
-    # loss = (L_actor + L_critic + L_entropy).sum() / batch_size
+    # loss = (L_actor + L_critic).sum() / batch_size
+    loss = (L_actor + L_critic + L_entropy).sum() / batch_size
     loss.backward()
     optimizer.step()
 
@@ -122,6 +126,7 @@ def optimize_model(model, optimizer, memory, batch_size=32):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train the network.')
     parser.add_argument('-c', '--clear', action='store_true', help='clear the network before training')
+    
     parser.add_argument('-e', '--epsilon', default=0.9, type=float, help='initial probability to choose a random action during training')
     parser.add_argument('-d', '--decay', default=200.0, type=float, help='epsilon decay')
     parser.add_argument('-f', '--final', default=0.05, type=float, help='final epsilon')
@@ -136,7 +141,7 @@ if __name__ == '__main__':
         model = PolicyNetwork()
         print >> sys.stderr, "Created new model"
     
-    optimizer = optim.Adam(model.parameters(), lr=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
     memory = ReplayMemory(200)
     
     running_avg = 0.0
@@ -161,7 +166,7 @@ if __name__ == '__main__':
             if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
                 continue
             
-            print "Epsilon threshold:", eps_threshold
+            # print "Epsilon threshold:", eps_threshold
             
             chosen_actions = []
             previous_score = game.get_current_score()
@@ -210,8 +215,8 @@ if __name__ == '__main__':
                 
                 # Perform one step of the optimization (on the target network)
                 optimize_model(model, optimizer, memory)
-            
-            # TODO add last turn
+                
+                # TODO add last turn
             
             print Counter(chosen_actions)
             print game.statistics
