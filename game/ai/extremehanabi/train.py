@@ -112,7 +112,7 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     log_probs = torch.masked_select(action_scores, mask=actions).unsqueeze(1)
     
     L_actor = - log_probs * (R-V).detach()
-    L_critic = 0.5 * (R-V)**2
+    L_critic = (R-V)**2
     # L_critic = 0.5 * F.smooth_l1_loss(V, R)
     L_entropy = 0.0001 * (log_probs.exp() * log_probs).sum(dim=-1)
     
@@ -121,6 +121,8 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     loss = (L_actor + L_critic + L_entropy).sum() / batch_size
     loss.backward()
     optimizer.step()
+    
+    # sys.exit(0)
 
 
 if __name__ == '__main__':
