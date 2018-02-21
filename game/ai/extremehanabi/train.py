@@ -112,9 +112,14 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     log_probs = torch.masked_select(action_scores, mask=actions).unsqueeze(1)
     
     L_actor = - log_probs * (R-V).detach()
-    L_critic = (R-V)**2
+    L_critic = 1.0 * (R-V)**2
     # L_critic = 0.5 * F.smooth_l1_loss(V, R)
-    L_entropy = 0.0001 * (log_probs.exp() * log_probs).sum(dim=-1)
+    L_entropy = 100.0 * (log_probs.exp() * log_probs).sum(dim=-1)
+    """
+    print L_actor
+    print L_critic
+    print L_entropy
+    """
     
     optimizer.zero_grad()
     # loss = (L_actor + L_critic).sum() / batch_size
@@ -133,6 +138,9 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--decay', default=200.0, type=float, help='epsilon decay')
     parser.add_argument('-f', '--final', default=0.05, type=float, help='final epsilon')
     
+    parser.add_argument('-l', '--lrate', default=1e-4, type=float, help='learning rate')
+    parser.add_argument('-m', '--memory', default=500, type=int, help='replay memory')
+    
     args = parser.parse_args()
     
     if not args.clear and os.path.isfile("model.tar"):
@@ -143,8 +151,12 @@ if __name__ == '__main__':
         model = PolicyNetwork()
         print >> sys.stderr, "Created new model"
     
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    memory = ReplayMemory(200)
+    optimizer = optim.Adam(model.parameters(), lr=args.lrate)
+    memory = ReplayMemory(args.memory)
+    
+    print "Using learning rate = %r" % args.lrate
+    print "Using replay memory = %d" % args.memory
+    print
     
     running_avg = 0.0
     running_reward = 0.0
@@ -182,17 +194,10 @@ if __name__ == '__main__':
                 # game.log_status()
                 
                 # Hanabi score reward
-                # reward = score - previous_score
+                reward = score - previous_score
                 
                 # penalize wrong action
-                if model.saved_action.chosen_action == ActionManager.HINT and turn.action.type != Action.HINT and old_hints == 0:
-                    reward -= 3.0
-                
-                if model.saved_action.chosen_action == ActionManager.PLAY and turn.action.type != Action.PLAY and not game.last_round:
-                    reward -= 2.0
-                
-                # do not discard if there are hints
-                if model.saved_action.chosen_action == ActionManager.DISCARD and old_hints > 0:
+                if model.saved_action.chosen_action[0] == ActionManager.HINT and turn.action.type != Action.HINT and old_hints == 0:
                     reward -= 1.0
                 
                 # print model.saved_action.chosen_action, turn.action.type, old_hints
@@ -202,9 +207,8 @@ if __name__ == '__main__':
                 game_reward += reward
                 
                 previous_score = score
-                # model.rewards.append(reward)
                 
-                chosen_actions.append(model.saved_action.chosen_action)
+                chosen_actions.append(model.saved_action.chosen_action[0])
                 
                 # store previous transition in memory
                 if old_state is not None:
@@ -220,20 +224,23 @@ if __name__ == '__main__':
                 
                 # TODO add last turn
             
-            print Counter(chosen_actions)
-            print game.statistics
-            running_avg = 0.95 * running_avg + 0.05 * game.statistics.score
-            running_reward = 0.95 * running_reward + 0.05 * game_reward
-            print "Running average score: %.2f" % running_avg
-            # print "Running average reward: %.2f" % running_reward
-            print "Game reward: %.2f" % game_reward
-            
-            if len(memory) < memory.capacity:
-                print "Memory size:", len(memory)
-            
             iteration += 1
             
             if iteration % 10 == 0:
+                print
+                print "Iteration %d" % iteration
+                print Counter(chosen_actions)
+                print game.statistics
+                running_avg = 0.99 * running_avg + 0.01 * game.statistics.score
+                running_reward = 0.99 * running_reward + 0.01 * game_reward
+                print "Running average score: %.2f" % running_avg
+                # print "Running average reward: %.2f" % running_reward
+                print "Game reward: %.2f" % game_reward
+                
+                if len(memory) < memory.capacity:
+                    print "Memory size:", len(memory)
+            
+            if iteration % 100 == 0:
                 torch.save(model, "model.tar")
             
             # finish_episode(model, optimizer)

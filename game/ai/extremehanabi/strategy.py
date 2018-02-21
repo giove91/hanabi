@@ -47,6 +47,23 @@ class Knowledge:
         Does the player know exactly this card?
         """
         return self.color and (self.number or self.playable)
+    
+    def compatible(self, card, color, number, board, full_deck, discard_pile):
+        """
+        Are the given values compatible with this knowledge?
+        (only takes into account "useless", "color" and "number")
+        """
+        if card is None:
+            return False
+        
+        res = True
+        if self.useless:
+            res = res and not card.useful(board, full_deck, discard_pile)
+        if self.color:
+            res = res and card.matches(color=color)
+        if self.number:
+            res = res and card.matches(number=number)
+        return res
 
 
 
@@ -415,17 +432,18 @@ class Strategy(BaseStrategy):
         
         
         # use neural network to determine action
-        action = self.action_manager.select_action()
-        self.log("chosen action is %r" % action)
+        action, card_pos = self.action_manager.select_action()
+        self.log("chosen action is %r, %r" % (action, card_pos))
         
-        if action == ActionManager.PLAY:
+        if action == ActionManager.PLAY and card_pos is not None:
+            """
             if self.last_turn is not None:
                 card_pos = self.get_best_play_last_round()
             else:
                 card_pos = self.get_best_play()
-            if card_pos is not None:
-                # play the card
-                return PlayAction(card_pos=card_pos)
+            """
+            # play the card
+            return PlayAction(card_pos=card_pos)
         
         if action == ActionManager.HINT and self.hints > 0:
             hints_manager = self.hints_scheduler.select_hints_manager(self.id, self.turn)
@@ -433,7 +451,11 @@ class Strategy(BaseStrategy):
             
             if hint_action is not None:
                 return hint_action
-            
+        
+        if action == ActionManager.DISCARD and card_pos is not None:
+            return DiscardAction(card_pos=card_pos)
+        
+        
         # discard card
         return DiscardAction(card_pos=self.get_best_discard()[0])
         
