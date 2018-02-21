@@ -160,7 +160,7 @@ class ActionManager(object):
                         if self.strategy.last_turn is not None else 0.0)
                     
                     # lives
-                    state.append(self.strategy.lives * 2.0 / 3.0 - 1.0)
+                    state.append(float(self.strategy.lives))
         
         """
         # deck size
@@ -206,10 +206,9 @@ class ActionManager(object):
         self.log("Probabilities: %r" % list(probs.data))
         self.log("Value: %r" % float(state_value.data))
         
-        if 'training' in self.strategy.params:
-            # sample from probability distribution
-            m = Categorical(probs)
-            action = m.sample().data[0]
+        if 'training' in self.strategy.params and random.random() < self.strategy.params['training']:
+            # choose at random
+            action = min(random.randint(0, 11), 8)
         
         else:
             # choose best action
@@ -229,10 +228,9 @@ class ActionManager(object):
         return chosen_action
         
         """
-        if 'training' in self.strategy.params and random.random() < self.strategy.params['training']:
-            # choose at random
-            action = random.randint(0, len(self.ACTIONS)-1)
+        if 'training' in self.strategy.params:
+            # sample from probability distribution
+            m = Categorical(probs)
+            action = m.sample().data[0]
         """
-
-
 

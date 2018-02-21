@@ -100,6 +100,11 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     """
     action_scores, state_values = model(Variable(states))
     _, next_state_values = model(Variable(next_states))
+    
+    # if this is a final state (lives == 0) then set reward = 0
+    indices = next_states.view((batch_size, -1))[:,-1].le(0.1) # select indices of transitions reaching the final state
+    next_state_values[indices] = 0.0
+    
     """
     print action_scores.exp()
     print states
@@ -114,7 +119,7 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     L_actor = - log_probs * (R-V).detach()
     L_critic = 1.0 * (R-V)**2
     # L_critic = 0.5 * F.smooth_l1_loss(V, R)
-    L_entropy = 100.0 * (log_probs.exp() * log_probs).sum(dim=-1)
+    # L_entropy = 100.0 * (log_probs.exp() * log_probs).sum(dim=-1)
     """
     print L_actor
     print L_critic
@@ -122,8 +127,8 @@ def optimize_model(model, optimizer, memory, batch_size=32):
     """
     
     optimizer.zero_grad()
-    # loss = (L_actor + L_critic).sum() / batch_size
-    loss = (L_actor + L_critic + L_entropy).sum() / batch_size
+    loss = (L_actor + L_critic).sum() / batch_size
+    # loss = (L_actor + L_critic + L_entropy).sum() / batch_size
     loss.backward()
     optimizer.step()
     
@@ -135,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clear', action='store_true', help='clear the network before training')
     
     parser.add_argument('-e', '--epsilon', default=0.9, type=float, help='initial probability to choose a random action during training')
-    parser.add_argument('-d', '--decay', default=200.0, type=float, help='epsilon decay')
+    parser.add_argument('-d', '--decay', default=1000.0, type=float, help='epsilon decay')
     parser.add_argument('-f', '--final', default=0.05, type=float, help='final epsilon')
     
     parser.add_argument('-l', '--lrate', default=1e-4, type=float, help='learning rate')
@@ -180,8 +185,6 @@ if __name__ == '__main__':
             if game.deck[0].color == Card.RAINBOW and game.deck[0].number < 5:
                 continue
             
-            # print "Epsilon threshold:", eps_threshold
-            
             chosen_actions = []
             previous_score = game.get_current_score()
             
@@ -200,9 +203,6 @@ if __name__ == '__main__':
                 if model.saved_action.chosen_action[0] == ActionManager.HINT and turn.action.type != Action.HINT and old_hints == 0:
                     reward -= 1.0
                 
-                # print model.saved_action.chosen_action, turn.action.type, old_hints
-                # print reward
-                # reward = float(reward) / 30.0
                 reward = float(reward)
                 game_reward += reward
                 
@@ -222,13 +222,18 @@ if __name__ == '__main__':
                 # Perform one step of the optimization (on the target network)
                 optimize_model(model, optimizer, memory)
                 
-                # TODO add last turn
+                # store transition to last turn
+                if game.end_game:
+                    memory.push(old_state, old_action, torch.zeros_like(old_state), old_reward)
+                    optimize_model(model, optimizer, memory)
+            
             
             iteration += 1
             
             if iteration % 10 == 0:
                 print
                 print "Iteration %d" % iteration
+                print "Epsilon threshold:", eps_threshold
                 print Counter(chosen_actions)
                 print game.statistics
                 running_avg = 0.99 * running_avg + 0.01 * game.statistics.score

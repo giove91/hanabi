@@ -288,12 +288,12 @@ class Game:
         Run the game, yielding (current_player, turn) after each turn.
         At the end, save statistics about the game.
         """
-        end_game = False
+        self.end_game = False
         current_player = self.players[0]
         
-        while not end_game:
+        while not self.end_game:
             # do turn
-            turn, end_game = self.run_turn(current_player)
+            turn, self.end_game = self.run_turn(current_player)
             
             # temporarily store this turn, for get_current_status()
             self.this_turn = turn
