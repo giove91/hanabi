@@ -264,7 +264,7 @@ class Strategy(BaseStrategy):
     
     def get_best_discard(self, pi):
         w = {1 : 25, 2 : 4, 3 : 0}
-        z = [1, 4, 2]
+        z = [1, 3, 3]
         remaining = self.deck - Counter(self.discard_pile)
         my_known = Counter(next(iter(ci.possible_cards)) for ci in pi if len(ci.possible_cards) == 1)
         known = my_known + self.pk.known_cards(self.hands.keys())
@@ -281,17 +281,19 @@ class Strategy(BaseStrategy):
             # beware: complicated stuff ahead
             is_known = int(len(pc) == 1)
             for c in pc:
-                if c not in self.pk.useful:
+                if c not in self.pk.useful or my_known[c] > is_known:
                     continue
+                board = copy.copy(self.board)
+                board[c.color] = c.number - 1
                 trash_value[i] += w[remaining[c]]
                 for j, p, q in [(0, remaining, remaining - Counter({c : remaining[c]})), (1, known + Counter([c] * (1 - is_known)), known - Counter([c] * is_known)), (2, visible + Counter([c] * (1 - is_known)), visible - Counter([c] * is_known))]:
-                    trash_value[i] += z[j] * (score_board(play_cards_on_board(copy.copy(self.board), p)) - score_board(play_cards_on_board(copy.copy(self.board), q)))
+                    trash_value[i] += z[j] * (score_board(play_cards_on_board(copy.copy(board), p)) - score_board(play_cards_on_board(copy.copy(board), q)))
             trash_value[i] /= len(pc)
         self.log(trash_value)
         return min(enumerate(trash_value), key = lambda x: x[1])
     
     def get_best_play(self, pi):
-        z = [1, 10, 6]
+        z = [1, 3, 6]
         high_board = play_cards_on_board(copy.copy(self.board), self.deck - Counter(self.discard_pile))
         my_known = Counter(next(iter(ci.possible_cards)) for ci in pi if len(ci.possible_cards) == 1)
         known = my_known + self.pk.known_cards(self.hands.keys())
@@ -428,11 +430,25 @@ class Strategy(BaseStrategy):
         if self.deck_size > 1 and h is not None:
             do_discard = False
             needed_hints = 1 - self.hints
+            new_board = copy.copy(self.board)
+            new_discard_pile = copy.copy(self.discard_pile)
             for i in map(self.next_player_id, range(1, self.num_players)):
                 ci = new_pk.card_info[i]
-                if all(any(not c.playable(self.board) for c in p.possible_cards) for p in ci) and any(len(p.possible_cards & new_pk.useful) == 0 for p in ci):
+                playable = [p.possible_cards for p in ci if len(p.possible_cards) > 0 and all(c.playable(new_board) for c in p.possible_cards)]
+                if len(playable) > 0:
+                    # he can play
+                    if len({c for p in playable for c in p}) == 1:
+                        c = next(iter(playable[0]))
+                        new_board[c.color] += 1
+                        if c.number == 5:
+                            needed_hints -= 1
+                        new_discard_pile.append(c)
+                        new_pk.update(new_board, new_discard_pile)
+                    continue
+                if  any(len(p.possible_cards & new_pk.useful) == 0 for p in ci):
+                    # he can discard a useless card
                     needed_hints -= 1
-                elif all(len(p.possible_cards & new_pk.useful) > 0 for p in ci) and all(any(not c.playable(self.board) for c in p.possible_cards) for p in ci):
+                elif all(len(p.possible_cards & new_pk.useful) > 0 for p in ci):
                     # predict what he will discard
                     other_ai = Strategy()
                     other_ai.initialize(i, self.num_players, self.k, self.board, self.deck_type, self.hands[i], copy.copy(self.hands), self.discard_pile, self.deck_size)
@@ -442,9 +458,8 @@ class Strategy(BaseStrategy):
                     for j, di in enumerate(pi):
                         if len(di.possible_cards) == 1:
                             other_ai.hands[self.id][j] = next(iter(di.possible_cards))
-                    _, other_trash_value = other_ai.get_best_discard([CardInfo({c}, -1) for c in self.hands[i]])
+                    _, other_trash_value = other_ai.get_best_discard(other_ai.private_info())
                     if other_trash_value >= max(5, trash_value + 3):
-                        #self.log('Discard with value {} to prevent {} from discarding with value {}'.format(trash_value, i, other_trash_value))
                         needed_hints += 1
                         if needed_hints > 0:
                             do_discard = True
@@ -452,11 +467,9 @@ class Strategy(BaseStrategy):
             if do_discard:
                 self.log('Discard with value {} to prevent someone else from discarding'.format(trash_value))
                 return DiscardAction(card_pos = best_discard)
-        '''
-        if self.hints < 8 and trash_value < 0 and all(not c.playable(self.board) for h in self.hands.itervalues() for c in h if c is not None):
+        if self.deck_size > 1 and self.hints < 8 and trash_value <= 0 and all(c not in self.pk.useful or len(ci.possible_cards) == 1 for p, h in self.hands.iteritems() for c, ci in itertools.izip(h, self.pk.card_info[p])):
             self.log('Hinting would be useless')
             h = None
-        '''
         # hint
         if h is None:
             return DiscardAction(card_pos = best_discard)
