@@ -184,21 +184,7 @@ class HintManager:
         return sorted([i for i, ci in enumerate(self.pk.card_info[player_id]) if len(ci.possible_cards) >= 2 and any(c not in trash_cards for c in ci.possible_cards)], key = lambda x: (not any(c.playable(self.pk.virtual_board) for c in self.pk.card_info[player_id][x].possible_cards), self.pk.card_info[player_id][x].last_hinted))
     
     def encode_trash_cards(self):
-        #return set()
         return self.pk.deck_composition - self.pk.useful
-        remaining_cards = self.pk.deck - Counter(self.pk.discard_pile)
-        high_board = play_cards_on_board(copy.copy(self.pk.board), remaining_cards)
-        def get_val(c):
-            if c not in self.pk.virtual_useful:
-                return (0, 0)
-            return (1 + int(remaining_cards[c] == 1), high_board[c.color] - c.number)
-        invisible_cards = sorted(((c, get_val(c)) for c in (remaining_cards - self.pk.known_cards()).elements()), key = lambda x : x[1])
-        if len(invisible_cards) == 0:
-            return set()
-        i = len(invisible_cards) // 2
-        while i + 1 < len(invisible_cards) and invisible_cards[i][1] == invisible_cards[i + 1][1]:
-            i += 1
-        return {invisible_cards[j][0] for j in range(i + 1)}
     
     def encode_hand(self, player_id, hand):
         cards = self.cards_for_hint(player_id)
@@ -338,85 +324,6 @@ class Strategy(BaseStrategy):
             return my_playable[0], None
         return simulate(self.id, hands, copy.copy(self.board), self.turn, self.last_turn)
     
-    def simulate_best_play(self, first_player, board0, turns):
-        best_score = 0
-        for comb in itertools.product(range(self.k), repeat = turns):
-            board = copy.copy(board0)
-            player_id = first_player
-            for j in comb:
-                d = self.hands[player_id][j]
-                if d is not None and d.playable(board):
-                    board[d.color] += 1
-                player_id = (player_id + 1) % self.num_players
-            best_score = max(best_score, score_board(board))
-        return best_score
-    
-    def get_best_play_before_last_turn(self, pi):
-        if self.deck_size > 1:
-            return None, None
-        self.hands[self.id] = [None] * self.k
-        for i, ci in enumerate(pi):
-            if len(ci.possible_cards) == 1:
-                self.hands[self.id][i] = next(iter(ci.possible_cards))
-        missing_useful_cards = self.pk.useful - set(itertools.chain(*self.hands.itervalues()))
-        if len(missing_useful_cards) > 1:
-            del self.hands[self.id]
-            return None, None
-        missing_card = None
-        if len(missing_useful_cards) > 0:
-            missing_card = next(iter(missing_useful_cards))
-        best_player, best_card_pos, best_score = self.id, None, 0
-        for i in range(self.hints):
-            player_id = self.next_player_id(i)
-            for card_pos in range(self.k):
-                c = self.hands[player_id][card_pos]
-                if c is None:
-                    continue
-                if c.playable(self.board):
-                    board0 = copy.copy(self.board)
-                    board0[c.color] += 1
-                    self.hands[player_id][card_pos] = missing_card
-                    score = self.simulate_best_play((player_id + 1) % self.num_players, board0, self.num_players)
-                    if score > best_score:
-                        best_player = player_id
-                        best_card_pos = card_pos
-                        best_score = score
-                    self.hands[player_id][card_pos] = c
-            if best_player != self.id:
-                break
-        del self.hands[self.id]
-        if best_player == self.id:
-            return best_card_pos, best_score
-        else:
-            return None, None
-    
-    def get_best_play_last_turn(self, pi):
-        # shamelessly stolen from alphahanabi
-        best_card_pos = None
-        best_avg_score = float(self.simulate_best_play(self.next_player_id(), self.board, self.last_turn - self.turn))
-        for i in range(self.k):
-            if self.my_hand[i] is None:
-                continue
-            pc = pi[i].possible_cards
-            avg_score = 0.0
-            for c in pc:
-                board0 = copy.copy(self.board)
-                lives = self.lives
-                if c.playable(board0):
-                    board0[c.color] += 1
-                else:
-                    lives -= 1
-                if lives >= 1:
-                    avg_score += self.simulate_best_play(self.next_player_id(), board0, self.last_turn - self.turn)
-                else:
-                    avg_score += score_board(board0)
-            avg_score /= len(pc)
-            if avg_score > best_avg_score:
-                best_avg_score = avg_score
-                best_card_pos = i
-        return best_card_pos, best_avg_score
-        
-    
     def get_turn_action(self):
         if self.verbose:
             for i in range(self.num_players):
@@ -429,20 +336,6 @@ class Strategy(BaseStrategy):
         best_play, play_value = self.get_best_play(pi)
         if best_play is not None:
             return PlayAction(card_pos = best_play)
-        '''
-        best_play, play_value = self.get_best_play_before_last_turn(pi)
-        if best_play is not None:
-            return PlayAction(card_pos = best_play)
-        if self.last_turn is None:
-            best_play, play_value = self.get_best_play(pi)
-            self.log((best_play, play_value))
-            if best_play is not None:
-                return PlayAction(card_pos = best_play)
-        else:
-            best_play, play_value = self.get_best_play_last_turn(pi)
-            if best_play is not None:
-                return PlayAction(card_pos = best_play)
-        '''
         # assume I give a hint: what happens?
         hm = HintManager(self.pk)
         h = hm.give_hint(self.id, self.hands)
@@ -497,7 +390,7 @@ class Strategy(BaseStrategy):
             if do_discard:
                 self.log('Discard with value {} to prevent someone else from discarding'.format(trash_value))
                 return DiscardAction(card_pos = best_discard)
-        if self.deck_size > 1 and self.hints < 4 and self.deck_size >= 10 and trash_value <= 0 and all(c not in self.pk.useful or len(ci.possible_cards) == 1 for p, h in self.hands.iteritems() for c, ci in itertools.izip(h, self.pk.card_info[p])):
+        if self.deck_size > 1 and self.hints < 4 and trash_value <= 0 and all(c not in self.pk.useful or len(ci.possible_cards) == 1 for p, h in self.hands.iteritems() for c, ci in itertools.izip(h, self.pk.card_info[p])):
             self.log('Hinting would be useless')
             h = None
         # hint
