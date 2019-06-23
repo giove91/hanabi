@@ -101,7 +101,7 @@ class HintManager:
         cards = self.cards_for_hint(player_id)
         playable_num = self.pk.k
         while True:
-            cols = sorted(c for c, n in self.pk.virtual_board.iteritems() if any(d.matches(c, n + 1) for i in cards[: playable_num] for d in self.pk.card_info[player_id][i].possible_cards))
+            cols = sorted(c for c, n in self.pk.virtual_board.iteritems() if any(d.color == c and d.number > n for i in cards[: playable_num] for d in self.pk.card_info[player_id][i].possible_cards))
             if self.PLAYABLE_CARDS_NUM[len(cols)] < playable_num:
                 playable_num -= 1
             else:
@@ -117,20 +117,27 @@ class HintManager:
                 my_ci[cards[0]].possible_cards = {p[number]}
                 my_ci[cards[0]].last_hinted = turn
                 return
-        playable_cards = {CardAppearance(c, self.pk.virtual_board[c] + 1) for c in cols}
         if number < len(cols) * playable_num:
             pos, col_index = divmod(number, len(cols))
             col = cols[col_index]
             for i in range(pos):
-                # not playable
-                my_ci[cards[i]].possible_cards -= playable_cards
+                # not "playable"
+                unplayable = {}
+                for c in my_ci[cards[i]].possible_cards:
+                    if c in self.pk.virtual_useful and (c.color not in unplayable or unplayable[c.color] > c.number):
+                        unplayable[c.color] = c.number
+                my_ci[cards[i]].possible_cards -= {CardAppearance(c, n) for c, n in unplayable.iteritems()}
                 my_ci[cards[i]].last_hinted = turn
-            # playable
-            my_ci[cards[pos]].possible_cards = {CardAppearance(col, self.pk.virtual_board[col] + 1)}
+            # "playable"
+            my_ci[cards[pos]].possible_cards = {CardAppearance(col, min(c.number for c in my_ci[cards[pos]].possible_cards if c.matches(col, None) and c in self.pk.virtual_useful))}
             my_ci[cards[pos]].last_hinted = turn
         else:
             for i in cards[: playable_num]:
-                my_ci[i].possible_cards -= playable_cards
+                unplayable = {}
+                for c in my_ci[i].possible_cards:
+                    if c in self.pk.virtual_useful and (c.color not in unplayable or unplayable[c.color] > c.number):
+                        unplayable[c.color] = c.number
+                my_ci[i].possible_cards -= {CardAppearance(c, n) for c, n in unplayable.iteritems()}
             trash_cards = self.encode_trash_cards()
             for i, b in zip(cards, format(number - len(cols) * playable_num, '0%db' % min(len(cards), trash_num))):
                 if b == '1':
@@ -197,7 +204,7 @@ class HintManager:
         cards = self.cards_for_hint(player_id)
         playable_num = self.pk.k
         while True:
-            cols = sorted(c for c, n in self.pk.virtual_board.iteritems() if any(d.matches(c, n + 1) for i in cards[: playable_num] for d in self.pk.card_info[player_id][i].possible_cards))
+            cols = sorted(c for c, n in self.pk.virtual_board.iteritems() if any(d.color == c and d.number > n for i in cards[: playable_num] for d in self.pk.card_info[player_id][i].possible_cards))
             if self.PLAYABLE_CARDS_NUM[len(cols)] < playable_num:
                 playable_num -= 1
             else:
@@ -209,13 +216,11 @@ class HintManager:
             p = sorted(self.pk.card_info[player_id][cards[0]].possible_cards)
             if len(p) <= 16:
                 return p.index(hand[cards[0]])
-        playable_cards = [(i, c) for i, c in enumerate(cards[: playable_num]) if hand[c].playable(self.pk.virtual_board)]
+        for i, j in enumerate(cards[: playable_num]):
+            if hand[j].number ==  min([6] + [c.number for c in self.pk.card_info[player_id][j].possible_cards if c.matches(hand[j].color, None) and c in self.pk.virtual_useful]):
+                return len(cols) * i + cols.index(hand[j].color)
         trash_cards = self.encode_trash_cards()
-        if len(playable_cards) == 0:
-            return len(cols) * playable_num + int(''.join('1' if hand[c] in trash_cards else '0' for c in cards[: trash_num]), base = 2)
-        else:
-            i, c = playable_cards[0]
-            return len(cols) * i + cols.index(hand[c].color)
+        return len(cols) * playable_num + int(''.join('1' if hand[c] in trash_cards else '0' for c in cards[: trash_num]), base = 2)
 
 
 class Strategy(BaseStrategy):
@@ -390,6 +395,9 @@ class Strategy(BaseStrategy):
         
     
     def get_turn_action(self):
+        if self.verbose:
+            for i in range(self.num_players):
+                print [next(iter(ci.possible_cards)) if len(ci.possible_cards) == 1 else 'T' if len(ci.possible_cards & self.pk.virtual_useful) == 0 else '?%d?' % len(ci.possible_cards) for ci in self.pk.card_info[i]]
         pi = self.private_info()
         # play
         best_play, play_value = self.get_best_play_before_last_turn(pi)
@@ -417,10 +425,14 @@ class Strategy(BaseStrategy):
         best_discard, trash_value = self.get_best_discard(pi)
         if self.hints == 0:
             return DiscardAction(card_pos = best_discard)
-        if self.hints == 1 and self.deck_size > 1 and h is not None:
-            hints_needed = 0
-            for i, ci in new_pk.card_info.iteritems():
-                if i != self.id and all(len(p.possible_cards & new_pk.useful) > 0 for p in ci) and all(any(not c.playable(self.board) for c in p.possible_cards) for p in ci):
+        if self.deck_size > 1 and h is not None:
+            do_discard = False
+            needed_hints = 1 - self.hints
+            for i in map(self.next_player_id, range(1, self.num_players)):
+                ci = new_pk.card_info[i]
+                if all(any(not c.playable(self.board) for c in p.possible_cards) for p in ci) and any(len(p.possible_cards & new_pk.useful) == 0 for p in ci):
+                    needed_hints -= 1
+                elif all(len(p.possible_cards & new_pk.useful) > 0 for p in ci) and all(any(not c.playable(self.board) for c in p.possible_cards) for p in ci):
                     # predict what he will discard
                     other_ai = Strategy()
                     other_ai.initialize(i, self.num_players, self.k, self.board, self.deck_type, self.hands[i], copy.copy(self.hands), self.discard_pile, self.deck_size)
@@ -431,12 +443,20 @@ class Strategy(BaseStrategy):
                         if len(di.possible_cards) == 1:
                             other_ai.hands[self.id][j] = next(iter(di.possible_cards))
                     _, other_trash_value = other_ai.get_best_discard([CardInfo({c}, -1) for c in self.hands[i]])
-                    if other_trash_value >= max(6, trash_value + 1):
-                        self.log('Discard with value {} to prevent {} from discarding with value {}'.format(trash_value, i, other_trash_value))
-                        return DiscardAction(card_pos = best_discard)
+                    if other_trash_value >= max(5, trash_value + 3):
+                        #self.log('Discard with value {} to prevent {} from discarding with value {}'.format(trash_value, i, other_trash_value))
+                        needed_hints += 1
+                        if needed_hints > 0:
+                            do_discard = True
+                            break
+            if do_discard:
+                self.log('Discard with value {} to prevent someone else from discarding'.format(trash_value))
+                return DiscardAction(card_pos = best_discard)
+        '''
         if self.hints < 8 and trash_value < 0 and all(not c.playable(self.board) for h in self.hands.itervalues() for c in h if c is not None):
             self.log('Hinting would be useless')
             h = None
+        '''
         # hint
         if h is None:
             return DiscardAction(card_pos = best_discard)

@@ -49,7 +49,7 @@ if __name__ == "__main__":
                 ai=ai,
                 ai_params=ai_params,
                 strategy_log=False,
-                dump_deck_to=None,
+                dump_deck_to='deck.txt',
                 load_deck_from=None,
             )
         
