@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
+import multiprocessing
 import sys
 
 from game.game import Game
@@ -42,8 +43,8 @@ if __name__ == "__main__":
     results = []
 
     print "Starting %d simulations with %d players..." % (num_simulations, num_players)
-    for i in xrange(num_simulations):
-        print >> sys.stderr, i,
+    def run_game(i):
+        #print(i, end=' ', file=sys.stderr, flush = True)
         game = Game(
                 num_players=num_players,
                 ai=ai,
@@ -56,8 +57,9 @@ if __name__ == "__main__":
         game.setup()
         for current_player, turn in game.run_game():
             pass
-        statistics = game.statistics
-        results.append(statistics)
+        return game.statistics
+    pool = multiprocessing.Pool(8)
+    results = pool.map(run_game, range(num_simulations))
     print
 
     scores = [statistics.score for statistics in results]
