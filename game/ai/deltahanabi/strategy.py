@@ -224,20 +224,14 @@ class Strategy(BaseStrategy):
         self.discard_pile = discard_pile
         self.deck_size = deck_size
         self.pk = PublicKnowledge(num_players, k, self.deck, board, discard_pile)
-        self.useless_hints = 0
     
     def feed_turn(self, player_id, action):
         if action.type == Action.HINT:
             hm = HintManager(self.pk)
             new_pk = hm.update_public_knowledge(player_id, action, self.id, self.hands)
             new_pk.update(self.board, self.discard_pile)
-            #if score_board(self.pk.virtual_board) == score_board(new_pk.virtual_board):
-            #    self.useless_hints += 1
-            #else:
-            #    self.useless_hints = 0
             self.pk = new_pk
         else:
-            self.useless_hints = 0
             self.pk.reset_knowledge(player_id, action.card_pos)
             for i, h in self.hands.iteritems():
                 for j, c in enumerate(h):
