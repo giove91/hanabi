@@ -139,7 +139,7 @@ class PublicKnowledge:
             num = 14
         else:
             num = 12
-        return sorted(((i, c.color, c.number) for i in cards for c in useful & self.possible_cards[player_id][i]), key = lambda x: (x[2] - board[x[1]], self.last_hinted[player_id][x[0]], x[1], x[2]))[: num]
+        return sorted(((i, c.color, c.number) for i in cards for c in useful & self.possible_cards[player_id][i]), key = lambda x: (x[2] - board[x[1]], self.last_hinted[player_id][x[0]], x[0]))[: num]
     
     def safe_discards(self, player_id):
         useful = useful_cards(self.ai.board, self.ai.deck, self.ai.discard_pile)
@@ -356,13 +356,26 @@ class Strategy(BaseStrategy):
         return h
     
     def choose_hint(self, boards):
-        number = sum(self.pk.encode_hand(self.next_player_id(i), b) for i, b in zip(xrange(1, self.num_players), boards)) % 16
+        number = 0
+        new_pk = self.pk.clone()
+        u = {}
+        for i, b in zip(map(self.next_player_id, xrange(1, self.num_players)), boards):
+            n = self.pk.encode_hand(i, b)
+            self.pk.decode_hand(i, b, n, new_pk)
+            number += n
+            u[i] = useful_cards(b, self.deck, self.discard_pile)
+        number %= 16
+        best_hint = None
+        best_score = (0, -float('inf'))
         for h in [HintAction(i, color = c) for i in self.hands.keys() for c in Card.COLORS] + [HintAction(i, number = n) for i in self.hands.keys() for n in range(1, Card.NUM_NUMBERS + 1)]:
             h.cards_pos = [i for i, c in enumerate(self.hands[h.player_id]) if c is not None and c.matches(h.color, h.number)]
             if h.cards_pos and self.pk.decode_number_from_hint(self.id, h) == number:
-                #TODO choose the hint according to the increase in knowledge
-                return h
-        return None
+                p = [{c for c in q if c.matches(h.color, h.number) == (i in h.cards_pos)} for i, q in enumerate(new_pk.possible_cards[h.player_id])]
+                score = (sum(1 for c in p if len(c) == 1 or len(c & u[h.player_id]) == 0), -sum(len(c & u[h.player_id]) for c in p))
+                if score > best_score:
+                    best_score = score
+                    best_hint = h
+        return best_hint
     
     def choose_discard_for_hint(self, safe_discards, boards):
         mod = len(safe_discards)
