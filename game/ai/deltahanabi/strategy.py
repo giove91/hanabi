@@ -141,8 +141,8 @@ class PublicKnowledge:
             num = 12
         return sorted(((i, c.color, c.number) for i in cards for c in useful & self.possible_cards[player_id][i]), key = lambda x: (x[2] - board[x[1]], self.last_hinted[player_id][x[0]], x[0]))[: num]
     
-    def safe_discards(self, player_id):
-        useful = useful_cards(self.ai.board, self.ai.deck, self.ai.discard_pile)
+    def safe_discards(self, player_id, discard_pile):
+        useful = useful_cards(self.ai.board, self.ai.deck, discard_pile)
         known = self.known_cards([player_id])
         return [i for i, p in enumerate(self.possible_cards[player_id]) if len(p) > 0 and (len(p & useful) == 0 or (len(p) == 1 and known[next(iter(p))] > 1))]
     
@@ -159,9 +159,9 @@ class PublicKnowledge:
         trash_num = LOG2[16 - len(l)]
         return len(l) + int('0' + ''.join('0' if hand[i] in useful else '1' for i in cards[: trash_num]), base = 2)
     
-    def encode_hand2(self, player_id, board, mod):
+    def encode_hand2(self, player_id, board, discard_pile, mod):
         hand = self.ai.hands[player_id]
-        useful = useful_cards(board, self.ai.deck, self.ai.discard_pile)
+        useful = useful_cards(board, self.ai.deck, discard_pile)
         cards = [i for i, p in enumerate(self.possible_cards[player_id]) if len(p) > 1 and len(p & useful) > 0]
         if len(cards) == 0:
             return 0
@@ -206,8 +206,8 @@ class PublicKnowledge:
                     new_pk.possible_cards[player_id][i] &= useful
                 new_pk.last_hinted[player_id][i] = self.ai.turn
     
-    def decode_hand2(self, player_id, board, mod, number, new_pk):
-        useful = useful_cards(board, self.ai.deck, self.ai.discard_pile)
+    def decode_hand2(self, player_id, board, discard_pile, mod, number, new_pk):
+        useful = useful_cards(board, self.ai.deck, discard_pile)
         cards = [i for i, p in enumerate(self.possible_cards[player_id]) if len(p) > 1 and len(p & useful) > 0]
         if len(cards) == 0:
             assert number == 0
@@ -244,7 +244,8 @@ class PublicKnowledge:
         self.last_hinted = new_pk.last_hinted
     
     def update_with_discard(self, discarder, action, boards):
-        d = self.safe_discards(discarder)
+        dp = self.ai.discard_pile[: -1]
+        d = self.safe_discards(discarder, dp)
         mod = len(d)
         if mod <= 1:
             return
@@ -254,15 +255,15 @@ class PublicKnowledge:
         for i, b in zip(xrange(1, self.ai.num_players), boards):
             p = (discarder + i) % self.ai.num_players
             if p != self.ai.id:
-                number = self.encode_hand2(p, b, mod)
-                self.decode_hand2(p, b, mod, number, new_pk)
+                number = self.encode_hand2(p, b, dp, mod)
+                self.decode_hand2(p, b, dp, mod, number, new_pk)
                 my_number -= number
             else:
                 my_board = b
         if self.ai.id == discarder:
             assert my_number % mod == 0
         else:
-            self.decode_hand2(self.ai.id, my_board, mod, my_number % mod, new_pk)
+            self.decode_hand2(self.ai.id, my_board, dp, mod, my_number % mod, new_pk)
         self.possible_cards = new_pk.possible_cards
         self.last_hinted = new_pk.last_hinted
         
@@ -305,7 +306,7 @@ class Strategy(BaseStrategy):
             return PlayAction(best_play)
         best_discard, discard_value = self.get_best_discard(pi)
         boards1, boards2, boards3 = itertools.tee(self.pk.get_boards(self.next_player_id()), 3)
-        safe_discards = self.pk.safe_discards(self.id)
+        safe_discards = self.pk.safe_discards(self.id, self.discard_pile)
         discard_action = DiscardAction(best_discard)
         if len(safe_discards) >= 2:
             discard_action = DiscardAction(self.choose_discard_for_hint(safe_discards, boards3))
@@ -379,7 +380,7 @@ class Strategy(BaseStrategy):
     
     def choose_discard_for_hint(self, safe_discards, boards):
         mod = len(safe_discards)
-        number = sum(self.pk.encode_hand2(self.next_player_id(i), b, mod) for i, b in zip(xrange(1, self.num_players), boards)) % mod
+        number = sum(self.pk.encode_hand2(self.next_player_id(i), b, self.discard_pile, mod) for i, b in zip(xrange(1, self.num_players), boards)) % mod
         self.log('Discarding %dth safe card to give extra info' % number)
         return safe_discards[number]
     
