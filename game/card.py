@@ -55,7 +55,7 @@ class CardAppearance:
     
     def __eq__(self, other):
         # same color and number
-        return self.color == other.color and self.number == other.number
+        return isinstance(other, CardAppearance) and self.color == other.color and self.number == other.number
 
     def __ne__(self, other):
         return self != other
