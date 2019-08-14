@@ -61,6 +61,8 @@ class CardAppearance:
         return self != other
     
     def __le__(self, other):
+        if other is None:
+            return False
         return (self.color, self.number) < (other.color, other.number)
     
     

@@ -58,7 +58,7 @@ if __name__ == "__main__":
         for current_player, turn in game.run_game():
             pass
         return game.statistics
-    pool = multiprocessing.Pool(8)
+    pool = multiprocessing.Pool(4)
     #pool.map = map # uncomment for debugging purposes
     results = pool.map(run_game, range(num_simulations))
     print

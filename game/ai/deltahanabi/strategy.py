@@ -386,13 +386,17 @@ class Strategy(BaseStrategy):
         return safe_discards[number]
     
     def get_best_play(self, pi):
-        if self.deck_size <= 3:
+        if self.deck_size <= 4:
             w = {None : 0, 'discard': 1, 'hint': 2, 0: 3, 1: 3, 2: 3, 3: 3}
             hands = copy.deepcopy(self.hands)
             def best_play_from_plays(plays):
                 play = max(plays, key = lambda p: (int(plays[p] * 10), w[p]))
                 return play, plays[play]
+            memo = {}
             def simulate(player_id, hands, board, turn, last_turn, deck, hints):
+                key = tuple(tuple(sorted(h)) for _, h in sorted(hands.items())) + tuple(n for _, n in sorted(board.items())) + tuple(deck) + (turn, last_turn, hints if last_turn is None else 0)
+                if key in memo:
+                    return memo[key]
                 s = float(score_board(board))
                 plays = defaultdict(lambda: s)
                 plays[None] = s
@@ -412,12 +416,13 @@ class Strategy(BaseStrategy):
                             hands[player_id][i] = c
                     u = useful_cards(board, self.deck, self.discard_pile)
                     discardable = next(([(i, c)] for i, c in enumerate(hands[player_id]) if c not in u), [])
-                    for i, c in discardable:
-                        hands[player_id][i] = draw_card
-                        if 'discard' not in plays:
-                            plays['discard'] = 0.0
-                        plays['discard'] += mult * best_play_from_plays(simulate((player_id + 1) % self.num_players, hands, board, turn + 1, last_turn, deck, hints + 1))[1]
-                        hands[player_id][i] = c
+                    if last_turn is None or hints == 0:
+                        for i, c in discardable:
+                            hands[player_id][i] = draw_card
+                            if 'discard' not in plays:
+                                plays['discard'] = 0.0
+                            plays['discard'] += mult * best_play_from_plays(simulate((player_id + 1) % self.num_players, hands, board, turn + 1, last_turn, deck, hints + 1))[1]
+                            hands[player_id][i] = c
                 if len(deck) > 0:
                     for draw_card, mult in Counter(deck).iteritems():
                         deck0 = copy.copy(deck)
@@ -427,6 +432,7 @@ class Strategy(BaseStrategy):
                         simulate0(draw_card, deck0, last_turn, mult / float(len(deck)))
                 else:
                     simulate0(None, [], last_turn)
+                memo[key] = plays
                 return plays
             u = useful_cards(self.board, self.deck, self.discard_pile)
             f = lambda x: x if x in u else None
