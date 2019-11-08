@@ -352,7 +352,7 @@ class Strategy(BaseStrategy):
                         return discard_action
                     hints -= 1
         u = useful_cards(self.board, self.deck, self.discard_pile)
-        if self.deck_size > 1 and self.hints < 4 and discard_value <= 0 and all(c not in u or len(p) == 1 for i, h in self.hands.iteritems() for c, p in zip(h, self.pk.possible_cards[i])):
+        if self.deck_size > 1 and self.hints < 8 and discard_value <= 0 and all(c not in u or len(p) == 1 for i, h in self.hands.iteritems() for c, p in zip(h, self.pk.possible_cards[i])):
             self.log('Hinting would be useless')
             return discard_action
         return h
@@ -394,7 +394,7 @@ class Strategy(BaseStrategy):
                 return play, plays[play]
             memo = {}
             def simulate(player_id, hands, board, turn, last_turn, deck, hints):
-                key = tuple(tuple(sorted(h)) for _, h in sorted(hands.items())) + tuple(n for _, n in sorted(board.items())) + tuple(deck) + (turn, last_turn, hints if last_turn is None else 0)
+                key = tuple(tuple(sorted(h)) for _, h in sorted(hands.items())) + tuple(n for _, n in sorted(board.items())) + tuple(sorted(deck)) + (turn, last_turn, hints if last_turn is None else 0)
                 if key in memo:
                     return memo[key]
                 s = float(score_board(board))
