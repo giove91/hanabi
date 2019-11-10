@@ -3,11 +3,12 @@
 
 import sys
 from collections import Counter
+from functools import total_ordering
 
 from action import Action
 
 
-
+@total_ordering
 class CardAppearance:
     """
     A card as seen by a player.
@@ -54,10 +55,15 @@ class CardAppearance:
     
     def __eq__(self, other):
         # same color and number
-        return self.color == other.color and self.number == other.number
+        return isinstance(other, CardAppearance) and self.color == other.color and self.number == other.number
 
     def __ne__(self, other):
         return self != other
+    
+    def __le__(self, other):
+        if other is None:
+            return False
+        return (self.color, self.number) < (other.color, other.number)
     
     
     def equals(self, other):

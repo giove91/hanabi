@@ -98,7 +98,7 @@ if __name__ == "__main__":
                 """
                 Print main view.
                 """
-                CURSOR_Y = term.height - 3
+                CURSOR_Y = term.height - 15
                 
                 # clear everything
                 print term.clear()
