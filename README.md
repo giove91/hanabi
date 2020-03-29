@@ -3,8 +3,24 @@ Hanabi
 
 This is a program that plays [Hanabi](https://boardgamegeek.com/boardgame/98778/hanabi).
 
-The main AI is contained in the directory `alphahanabi`. It currently plays well 4 and 5-player games.
+The main AI is contained in the directory `alphahanabi`. It is optimized for 5-player games, but it also plays well 4-player games.
 A sample (stupid) AI is provided in the directory `dummy`.
+An additional stronger AI is contained in the directory `deltahanabi`.
+
+
+Performance
+---------------------
+
+Here are the average scores and win rates for the standard 50-card deck (5 colors) and for the "black" variant (6 colors, where the 6th color has 1 copy of each card).
+
+
+ AI                    | standard 4 players | standard 5 players | black 4 players | black 5 players |
+-----------------------|--------------------|--------------------|-----------------|-----------------|
+alphahanabi (moderate) | 6.3 %              | 12.1 %             | 
+alphahanabi (hard)     | -                  | 54.7 %             | -               | 
+alphahanabi (hardest)  | 76.7 %             | 80.6 %
+deltahanabi            | 73.2 %             | 96.1 %
+
 
 Requirements
 ---------------------
