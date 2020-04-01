@@ -19,8 +19,8 @@ Here are the average scores and win rates for the standard 50-card deck (5 color
 -----------------------|--------------------|--------------------|-----------------|-----------------|
 alphahanabi (moderate) | 22.40              | 23.25              | 24.87           | 26.56           |
 alphahanabi (hard)     | -                  | 24.26              | -               | 27.67           |
-alphahanabi (hardest)  | 24.67              | 24.75              | 28.47           | 28.82           |
-deltahanabi            | 24.57              | 24.95              | 28.36           | 29.39           |
+alphahanabi (hardest)  | **24.67**          | 24.75              | **28.47**       | 28.82           |
+deltahanabi            | 24.57              | **24.95**          | 28.36           | **29.39**       |
 
 **Win rates**
 
@@ -28,8 +28,8 @@ deltahanabi            | 24.57              | 24.95              | 28.36        
 -----------------------|--------------------|--------------------|-----------------|-----------------|
 alphahanabi (moderate) | 6.3 %              | 12.4 %             | 0.2 %           | 1.2 %           |
 alphahanabi (hard)     | -                  | 54.4 %             | -               | 16.2 %          |
-alphahanabi (hardest)  | 76.4 %             | 80.5 %             | 32.0 %          | 40.7 %          |
-deltahanabi            | 72.9 %             | 95.9 %             | 38.2 %          | 65.7 %          |
+alphahanabi (hardest)  | **76.4 %**         | 80.5 %             | 32.0 %          | 40.7 %          |
+deltahanabi            | 72.9 %             | **95.9 %**         | **38.2 %**      | **65.7 %**      |
 
 
 Requirements
